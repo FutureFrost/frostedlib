@@ -1,0 +1,36 @@
+{
+	"schemaVersion": 1,
+	"id": "frostedlib",
+	"version": "${version}",
+	"name": "frostedlib",
+	"description": "A library for Origins teleportation and position management.",
+	"authors": [
+		"Future Frost"
+	],
+	"contact": {
+		"sources": "https://github.com/FutureFrost/frostedlib"
+	},
+	"license": "MIT",
+	"icon": "assets/frostedlib/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.futurefrost.frostedlib.FrostedLib"
+		],
+		"client": [
+			"com.futurefrost.frostedlib.FrostedLibClient"
+		],
+		"fabric-datagen": [
+			"com.futurefrost.frostedlib.FrostedLibDataGenerator"
+		]
+	},
+	"mixins": [
+		"frostedlib.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.3",
+		"minecraft": "~1.20.1",
+		"java": ">=17",
+		"fabric-api": "*"
+	}
+}
