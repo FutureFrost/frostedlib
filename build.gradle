@@ -71,15 +71,15 @@ dependencies {
 	modImplementation "io.github.apace100:origins-fabric:${project.origins_version}"
 	modImplementation "io.github.apace100:apoli:${project.apoli_version}"
 
-	// Include Origins in dev environment
-	modLocalRuntime "io.github.apace100:origins-fabric:${project.origins_version}"
-
 	// Cardinal Components API for entity data
 	modImplementation "dev.onyxstudios.cardinal-components-api:cardinal-components-base:${project.cardinal_components_version}"
 	modImplementation "dev.onyxstudios.cardinal-components-api:cardinal-components-entity:${project.cardinal_components_version}"
 
 	include "dev.onyxstudios.cardinal-components-api:cardinal-components-base:${project.cardinal_components_version}"
 	include "dev.onyxstudios.cardinal-components-api:cardinal-components-entity:${project.cardinal_components_version}"
+
+	//  Modmenu
+	modImplementation "com.terraformersmc:modmenu:${project.mod_menu_version}"
 }
 
 processResources {

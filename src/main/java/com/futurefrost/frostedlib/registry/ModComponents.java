@@ -10,7 +10,6 @@ import dev.onyxstudios.cca.api.v3.entity.RespawnCopyStrategy;
 import net.minecraft.util.Identifier;
 
 public class ModComponents implements EntityComponentInitializer {
-    // IMPORTANT: Use PlayerDataComponentImpl.class, NOT PlayerDataComponent.class
     public static final ComponentKey<PlayerDataComponentImpl> PLAYER_DATA =
             ComponentRegistry.getOrCreate(
                     Identifier.of(FrostedLib.MOD_ID, "player_data"),
@@ -27,6 +26,5 @@ public class ModComponents implements EntityComponentInitializer {
     }
 
     public static void init() {
-        // Component registration happens automatically via EntityComponentInitializer
     }
 }

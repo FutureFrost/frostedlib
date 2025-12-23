@@ -82,7 +82,6 @@ public class TeleportHelper {
         BlockState groundState = world.getBlockState(groundPos);
 
         // Feet and head must be air or replaceable
-        // In 1.20+, use canPathfindThrough or isReplaceable
         boolean feetSafe = feetState.isAir() || feetState.isReplaceable();
         boolean headSafe = headState.isAir() || headState.isReplaceable();
 
