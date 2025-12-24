@@ -8,16 +8,24 @@ import com.futurefrost.frostedlib.data.PlayerDataComponentImpl;
 import com.futurefrost.frostedlib.data.PositionData;
 import com.futurefrost.frostedlib.registry.ModComponents; // ADD THIS IMPORT
 import com.futurefrost.frostedlib.util.TeleportHelper;
+import net.minecraft.block.BedBlock;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.RespawnAnchorBlock;
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.argument.DimensionArgumentType;
 import net.minecraft.command.argument.Vec3ArgumentType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.world.World;
 
 import java.util.Map;
 import java.util.Optional;
@@ -86,16 +94,13 @@ public class FrostedCommands {
         }
 
         String id = StringArgumentType.getString(context, "id");
-
-        // FIXED: Use ModComponents.PLAYER_DATA.get()
         PlayerDataComponent data = ModComponents.PLAYER_DATA.get(player);
-
         Optional<PositionData> optionalPos = data.getPosition(id);
 
         if (optionalPos.isPresent()) {
             PositionData pos = optionalPos.get();
-
             ServerWorld targetWorld = player.getServer().getWorld(pos.dimension());
+
             if (targetWorld == null) {
                 source.sendError(Text.literal("Target dimension '" + pos.dimension().getValue() + "' not found or not loaded"));
                 return 0;
@@ -122,27 +127,122 @@ public class FrostedCommands {
                 return 0;
             }
         } else {
-            // Failsafe: teleport to world spawn
-            ServerWorld overworld = player.getServer().getOverworld();
-            Vec3d spawnPos = Vec3d.ofBottomCenter(overworld.getSpawnPos());
+            // FAILSAFE: Properly handle respawn anchor (Nether) vs bed (Overworld) vs world spawn
 
+            MinecraftServer server = player.getServer();
+            if (server == null) return 0;
+
+            // Get the player's spawn dimension and position
+            RegistryKey<World> spawnDimension = player.getSpawnPointDimension();
+            BlockPos spawnBlockPos = player.getSpawnPointPosition();
+
+            // Determine what type of spawn we have
+            boolean hasValidSpawnPoint = false;
+            ServerWorld targetWorld = null;
+            Vec3d spawnLocation = null;
+            String spawnType = "world spawn";
+
+            // Check if we have a spawn position AND dimension
+            if (spawnBlockPos != null && spawnDimension != null) {
+                targetWorld = server.getWorld(spawnDimension);
+
+                if (targetWorld != null) {
+                    // Check if it's a valid spawn point in that dimension
+                    if (spawnDimension == World.OVERWORLD) {
+                        // In Overworld, check for bed
+                        BlockState blockState = targetWorld.getBlockState(spawnBlockPos);
+                        boolean isBed = blockState.getBlock() instanceof BedBlock;
+                        boolean isWorldSpawn = spawnBlockPos.equals(targetWorld.getSpawnPos());
+                        hasValidSpawnPoint = isBed && !isWorldSpawn;
+                        spawnType = "bed spawn";
+                    } else if (spawnDimension == World.NETHER) {
+                        // In Nether, check for respawn anchor (charged)
+                        BlockState blockState = targetWorld.getBlockState(spawnBlockPos);
+                        boolean isRespawnAnchor = blockState.getBlock() instanceof RespawnAnchorBlock;
+                        boolean isCharged = isRespawnAnchor && blockState.get(RespawnAnchorBlock.CHARGES) > 0;
+                        hasValidSpawnPoint = isRespawnAnchor && isCharged;
+                        spawnType = "respawn anchor";
+                    } else {
+                        // Other dimensions - just check if position exists
+                        hasValidSpawnPoint = true;
+                        spawnType = "dimension spawn point";
+                    }
+                }
+            }
+
+            // If no valid spawn point found, use default world spawn
+            if (!hasValidSpawnPoint || targetWorld == null) {
+                targetWorld = server.getOverworld();
+                spawnBlockPos = targetWorld.getSpawnPos();
+                spawnType = "world spawn";
+            }
+
+            // Now find the actual spawn location
+            if (hasValidSpawnPoint && spawnBlockPos != null) {
+                // Try to find safe position near the spawn point
+                Optional<Vec3d> safeSpawn = PlayerEntity.findRespawnPosition(
+                        targetWorld,
+                        spawnBlockPos,
+                        player.getSpawnAngle(),
+                        false, // not forced
+                        true   // keep searching for safe spot
+                );
+
+                if (safeSpawn.isPresent()) {
+                    spawnLocation = safeSpawn.get();
+
+                    // Double-check the spawn block still exists
+                    if (spawnDimension == World.OVERWORLD) {
+                        BlockState checkState = targetWorld.getBlockState(spawnBlockPos);
+                        if (!(checkState.getBlock() instanceof BedBlock)) {
+                            // Bed was destroyed, revert to world spawn
+                            targetWorld = server.getOverworld();
+                            spawnLocation = Vec3d.ofBottomCenter(targetWorld.getSpawnPos());
+                            spawnType = "world spawn (bed missing)";
+                        }
+                    } else if (spawnDimension == World.NETHER) {
+                        BlockState checkState = targetWorld.getBlockState(spawnBlockPos);
+                        if (!(checkState.getBlock() instanceof RespawnAnchorBlock) ||
+                                checkState.get(RespawnAnchorBlock.CHARGES) <= 0) {
+                            // Respawn anchor missing or uncharged
+                            targetWorld = server.getOverworld();
+                            spawnLocation = Vec3d.ofBottomCenter(targetWorld.getSpawnPos());
+                            spawnType = "world spawn (anchor missing/uncharged)";
+                        }
+                    }
+                } else {
+                    // Spawn point is obstructed
+                    targetWorld = server.getOverworld();
+                    spawnLocation = Vec3d.ofBottomCenter(targetWorld.getSpawnPos());
+                    spawnType = "world spawn (spawn obstructed)";
+                }
+            } else {
+                // Go directly to world spawn
+                spawnLocation = Vec3d.ofBottomCenter(targetWorld.getSpawnPos());
+            }
+
+            // Teleport player
             boolean success = TeleportHelper.teleportPlayer(
                     player,
-                    overworld,
-                    spawnPos,
-                    player.getYaw(),
-                    player.getPitch()
+                    targetWorld,
+                    spawnLocation,
+                    player.getSpawnAngle(),
+                    0.0f
             );
 
             if (success) {
+                String finalSpawnType = spawnType;
+                Vec3d finalSpawnLocation = spawnLocation;
+                ServerWorld finalTargetWorld = targetWorld;
                 source.sendFeedback(() ->
-                                Text.literal("Position '" + id + "' not found. Teleported to world spawn at " +
-                                        String.format("%.1f, %.1f, %.1f", spawnPos.x, spawnPos.y, spawnPos.z)),
+                                Text.literal("Position '" + id + "' not found. Teleported to " + finalSpawnType +
+                                        " at " + String.format("%.1f, %.1f, %.1f", finalSpawnLocation.x, finalSpawnLocation.y, finalSpawnLocation.z) +
+                                        " in " + finalTargetWorld.getRegistryKey().getValue()),
                         true
                 );
                 return 1;
             } else {
-                source.sendError(Text.literal("Position '" + id + "' not found AND failed to teleport to spawn"));
+                source.sendError(Text.literal("Position '" + id + "' not found AND failed to teleport to " + spawnType));
                 return 0;
             }
         }

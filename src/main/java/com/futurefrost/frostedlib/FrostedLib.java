@@ -21,13 +21,23 @@ public class FrostedLib implements ModInitializer {
 		// This code runs as soon as Minecraft is in a mod-load-ready state.
 		// However, some things (like resources) may still be uninitialized.
 		// Proceed with mild caution.
-		LOGGER.info("Initializing FrostedLib");
+		LOGGER.info("=== FrostedLib Initialization ===");
 
 		// Initialize components (player data storage)
-		ModComponents.init();
+		try {
+			ModComponents.init();
+			LOGGER.info("Components Initialized");
+		} catch (Exception e) {
+			LOGGER.error("Failed to Initialize Components", e);
+		}
 
 		// Register power types
-		ModPowers.init();
+		try {
+			ModPowers.init();
+			LOGGER.info("Power Types Registered");
+		} catch (Exception e) {
+			LOGGER.error("Failed to Register Power Types", e);
+		}
 
 		// Register commands HERE instead of in server initializer
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -35,6 +45,6 @@ public class FrostedLib implements ModInitializer {
 			FrostedCommands.register(dispatcher);
 		});
 
-		LOGGER.info("FrostedLib initialized successfully!");
+		LOGGER.info("==== FrostedLib Initialized ====");
 	}
 }
