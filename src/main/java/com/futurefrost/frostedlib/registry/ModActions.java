@@ -3,6 +3,7 @@ package com.futurefrost.frostedlib.registry;
 import com.futurefrost.frostedlib.FrostedLib;
 import com.futurefrost.frostedlib.action.FakeRespawnAction;
 import com.futurefrost.frostedlib.action.ReturnPositionAction;
+import com.futurefrost.frostedlib.action.SavePositionAction;
 import io.github.apace100.apoli.registry.ApoliRegistries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
@@ -17,6 +18,15 @@ public class ModActions {
                 ApoliRegistries.ENTITY_ACTION,
                 Identifier.of(FrostedLib.MOD_ID, "fake_respawn"),
                 FakeRespawnAction.getFactory()
+        );
+
+        FrostedLib.LOGGER.info("Registering save_pos...");
+
+        // Register save_pos action
+        Registry.register(
+                ApoliRegistries.ENTITY_ACTION,
+                Identifier.of(FrostedLib.MOD_ID, "save_pos"),
+                SavePositionAction.getFactory()
         );
 
         FrostedLib.LOGGER.info("Registering return_pos...");

@@ -3,7 +3,6 @@ package com.futurefrost.frostedlib;
 import com.futurefrost.frostedlib.command.FrostedCommands;
 import com.futurefrost.frostedlib.registry.ModActions;
 import com.futurefrost.frostedlib.registry.ModComponents;
-import com.futurefrost.frostedlib.registry.ModPowers;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import org.slf4j.Logger;
@@ -30,14 +29,6 @@ public class FrostedLib implements ModInitializer {
 			LOGGER.info("Components Initialized");
 		} catch (Exception e) {
 			LOGGER.error("Failed to Initialize Components", e);
-		}
-
-		// Register power types
-		try {
-			ModPowers.init();
-			LOGGER.info("Power Types Registered");
-		} catch (Exception e) {
-			LOGGER.error("Failed to Register Power Types", e);
 		}
 
 		// Register action types
