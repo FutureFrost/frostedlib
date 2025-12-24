@@ -7,8 +7,11 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 public class FrostedLibServer implements DedicatedServerModInitializer {
     @Override
     public void onInitializeServer() {
-        // Register commands on server startup
+        FrostedLib.LOGGER.info("FrostedLib Server Initializer Running!");
+
+        // Register commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            FrostedLib.LOGGER.info("Registering FrostedLib Commands on Server!...");
             FrostedCommands.register(dispatcher);
         });
     }

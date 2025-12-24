@@ -24,6 +24,6 @@ public class ModPowers {
                 ReturnPositionPower.createFactory()
         );
 
-        FrostedLib.LOGGER.info("Registered FrostedLib power types");
+        FrostedLib.LOGGER.info("Registered FrostedLib Power Types");
     }
 }

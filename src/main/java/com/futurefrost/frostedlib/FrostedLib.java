@@ -1,8 +1,10 @@
 package com.futurefrost.frostedlib;
 
+import com.futurefrost.frostedlib.command.FrostedCommands;
 import com.futurefrost.frostedlib.registry.ModComponents;
 import com.futurefrost.frostedlib.registry.ModPowers;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +28,12 @@ public class FrostedLib implements ModInitializer {
 
 		// Register power types
 		ModPowers.init();
+
+		// Register commands HERE instead of in server initializer
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+			LOGGER.info("Registering FrostedLib Commands on Client!");
+			FrostedCommands.register(dispatcher);
+		});
 
 		LOGGER.info("FrostedLib initialized successfully!");
 	}
