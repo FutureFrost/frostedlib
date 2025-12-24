@@ -1,6 +1,7 @@
 package com.futurefrost.frostedlib;
 
 import com.futurefrost.frostedlib.command.FrostedCommands;
+import com.futurefrost.frostedlib.registry.ModActions;
 import com.futurefrost.frostedlib.registry.ModComponents;
 import com.futurefrost.frostedlib.registry.ModPowers;
 import net.fabricmc.api.ModInitializer;
@@ -37,6 +38,14 @@ public class FrostedLib implements ModInitializer {
 			LOGGER.info("Power Types Registered");
 		} catch (Exception e) {
 			LOGGER.error("Failed to Register Power Types", e);
+		}
+
+		// Register action types
+		try {
+			ModActions.init();
+			LOGGER.info("Action Types Registered");
+		} catch (Exception e) {
+			LOGGER.error("Failed to Register Action Types", e);
 		}
 
 		// Register commands HERE instead of in server initializer
