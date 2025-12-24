@@ -22,6 +22,9 @@
 		],
 		"fabric-datagen": [
 			"com.futurefrost.frostedlib.FrostedLibDataGenerator"
+		],
+		"cardinal-components": [
+			"com.futurefrost.frostedlib.registry.ModComponents"
 		]
 	},
 	"mixins": [
@@ -38,6 +41,9 @@
 		"another-mod": "*"
 	},
 	"custom": {
+		"cardinal-components": [
+			"frostedlib:player_data"
+		],
 		"origins:power_types": [
 			"frostedlib:save_pos",
 			"frostedlib:return_pos",
