@@ -1,6 +1,7 @@
 package com.futurefrost.frostedlib.registry;
 
 import com.futurefrost.frostedlib.FrostedLib;
+import com.futurefrost.frostedlib.action.DimensionShiftAction;
 import com.futurefrost.frostedlib.action.FakeRespawnAction;
 import com.futurefrost.frostedlib.action.ReturnPositionAction;
 import com.futurefrost.frostedlib.action.SavePositionAction;
@@ -22,7 +23,6 @@ public class ModActions {
 
         FrostedLib.LOGGER.info("Registering save_pos...");
 
-        // Register save_pos action
         Registry.register(
                 ApoliRegistries.ENTITY_ACTION,
                 Identifier.of(FrostedLib.MOD_ID, "save_pos"),
@@ -35,6 +35,14 @@ public class ModActions {
                 ApoliRegistries.ENTITY_ACTION,
                 Identifier.of(FrostedLib.MOD_ID, "return_pos"),
                 ReturnPositionAction.getFactory()
+        );
+
+        FrostedLib.LOGGER.info("Registering dimension_shift...");
+
+        Registry.register(
+                ApoliRegistries.ENTITY_ACTION,
+                Identifier.of(FrostedLib.MOD_ID, "dimension_shift"),
+                DimensionShiftAction.getFactory()
         );
 
         FrostedLib.LOGGER.info("Registered FrostedLib actions");
