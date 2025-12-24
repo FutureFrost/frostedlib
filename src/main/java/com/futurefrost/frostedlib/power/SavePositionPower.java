@@ -25,7 +25,7 @@ public class SavePositionPower extends BaseFrostedPower {
         if (this.entity instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
             PlayerDataComponent data = ComponentAccessor.getPlayerData((net.minecraft.entity.player.PlayerEntity) entity);
             if (data != null) {
-                PositionData pos = PositionData.fromPlayer(serverPlayer);
+                PositionData pos = PositionData.fromEntity(serverPlayer);
                 data.savePosition(positionId, pos);
 
                 // Send feedback to player

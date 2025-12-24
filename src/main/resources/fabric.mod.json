@@ -42,7 +42,8 @@
 	},
 	"custom": {
 		"cardinal-components": [
-			"frostedlib:player_data"
+			"frostedlib:player_data",
+			"frostedlib:entity_data"
 		],
 		"origins:power_types": [
 			"frostedlib:save_pos",

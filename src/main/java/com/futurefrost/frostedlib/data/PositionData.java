@@ -7,6 +7,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.entity.Entity;
 
 public record PositionData(
         RegistryKey<World> dimension,
@@ -16,6 +17,7 @@ public record PositionData(
         float yaw,
         float pitch
 ) {
+
     // Serialize to NBT for saving
     public NbtCompound toNbt() {
         NbtCompound nbt = new NbtCompound();
@@ -58,15 +60,15 @@ public record PositionData(
         return new Vec3d(x, y, z);
     }
 
-    // Helper to create from player's current position
-    public static PositionData fromPlayer(net.minecraft.server.network.ServerPlayerEntity player) {
+    // Helper to create from any entity's current position
+    public static PositionData fromEntity(Entity entity) {
         return new PositionData(
-                player.getWorld().getRegistryKey(),
-                player.getX(),
-                player.getY(),
-                player.getZ(),
-                player.getYaw(),
-                player.getPitch()
+                entity.getWorld().getRegistryKey(),
+                entity.getX(),
+                entity.getY(),
+                entity.getZ(),
+                entity.getYaw(),
+                entity.getPitch()
         );
     }
 }
