@@ -5,7 +5,6 @@ import io.github.apace100.calio.data.SerializableData;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
-import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
@@ -21,14 +20,34 @@ public class PositionFinder {
     private static final String HEIGHT_EXPOSED = "exposed";
     private static final String HEIGHT_UNEXPOSED = "unexposed";
     private static final String HEIGHT_RELATIVE = "relative";
+    private static final String HEIGHT_FIXED = "fixed";
 
     public Vec3d findSafePosition(SerializableData.Instance data, Entity entity,
                                   ServerWorld world, int centerX, int centerZ) {
         String heightMode = data.getString("target_height");
         if (heightMode == null) {
+            // Should not happen as each action sets a default
             heightMode = HEIGHT_EXPOSED;
         }
-        double preferredY = entity.getY();
+
+        // Get preferred Y based on height mode
+        double preferredY;
+        if (heightMode.equals(HEIGHT_FIXED)) {
+            // For fixed mode, use target_y as preferred Y
+            preferredY = data.getDouble("target_y");
+        } else if (heightMode.equals(HEIGHT_RELATIVE)) {
+            // For relative mode, check if target_y is specified
+            Double targetY = data.get("target_y");
+            if (targetY != null) {
+                preferredY = targetY;
+            } else {
+                preferredY = entity.getY();
+            }
+        } else {
+            // For exposed/unexposed, use entity's current Y
+            preferredY = entity.getY();
+        }
+
         boolean strictHeight = data.getBoolean("strict_height");
         boolean generatePlatform = data.getBoolean("generate_platform");
 
@@ -69,8 +88,61 @@ public class PositionFinder {
         int worldBottom = world.getBottomY();
         int worldTop = world.getTopY();
 
-        if (mode.equals(HEIGHT_UNEXPOSED)) {
-            // Search downward from preferred Y for cave position
+        if (mode.equals(HEIGHT_FIXED)) {
+            // FIXED mode: try to get as close to preferredY (target_y) as possible
+            int targetY = (int) preferredY;
+
+            // First try the exact target Y
+            if (isPositionSafeForEntity(data, world, x, targetY, z)) {
+                // Check for unsafe liquids
+                BlockPos testPos = new BlockPos(x, targetY, z);
+                if (isBlockUnsafeLiquid(data, world, testPos) ||
+                        isBlockUnsafeLiquid(data, world, testPos.down())) {
+                    // Position is in unsafe liquid, continue searching
+                } else {
+                    return new Vec3d(x + 0.5, targetY, z + 0.5);
+                }
+            }
+
+            // Search upward and downward from target Y
+            for (int offset = 1; offset < 64; offset++) {
+                // Try above
+                int yAbove = targetY + offset;
+                if (yAbove <= worldTop) {
+                    BlockPos testPos = new BlockPos(x, yAbove, z);
+                    if (isPositionSafeForEntity(data, world, x, yAbove, z)) {
+                        // Check for unsafe liquids
+                        if (!isBlockUnsafeLiquid(data, world, testPos) &&
+                                !isBlockUnsafeLiquid(data, world, testPos.down())) {
+                            return new Vec3d(x + 0.5, yAbove, z + 0.5);
+                        }
+                    }
+                }
+
+                // Try below
+                int yBelow = targetY - offset;
+                if (yBelow >= worldBottom) {
+                    BlockPos testPos = new BlockPos(x, yBelow, z);
+                    if (isPositionSafeForEntity(data, world, x, yBelow, z)) {
+                        // Check for unsafe liquids
+                        if (!isBlockUnsafeLiquid(data, world, testPos) &&
+                                !isBlockUnsafeLiquid(data, world, testPos.down())) {
+                            return new Vec3d(x + 0.5, yBelow, z + 0.5);
+                        }
+                    }
+                }
+            }
+
+            // If strict height is enabled and we can't find position near targetY, fail
+            if (strictHeight) {
+                return null;
+            }
+
+            // Otherwise fall back to surface
+            return getSurfacePosition(data, world, x, z);
+
+        } else if (mode.equals(HEIGHT_UNEXPOSED)) {
+            // UNEXPOSED mode: Search downward from preferred Y for cave position
             int startY = Math.min((int) preferredY, worldTop - 10);
             for (int y = startY; y >= worldBottom; y--) {
                 BlockPos testPos = new BlockPos(x, y, z);
@@ -92,8 +164,9 @@ public class PositionFinder {
 
             // Fallback to surface (last resort for unexposed)
             return getSurfacePosition(data, world, x, z);
+
         } else if (mode.equals(HEIGHT_RELATIVE)) {
-            // Search around preferred Y
+            // RELATIVE mode: Search around preferred Y
             int centerY = (int) preferredY;
             for (int offset = 0; offset < 64; offset++) {
                 // Check above
@@ -124,14 +197,15 @@ public class PositionFinder {
             }
             // Fallback to surface
             return getSurfacePosition(data, world, x, z);
+
         } else {
-            // EXPOSED (default)
+            // EXPOSED mode (default)
             Vec3d surfacePos = getSurfacePosition(data, world, x, z);
 
             // If strict height is enabled, check if this is truly exposed
             if (strictHeight && surfacePos != null) {
                 BlockPos testPos = new BlockPos((int) surfacePos.x, (int) surfacePos.y, (int) surfacePos.z);
-                if (!world.isSkyVisible(testPos.down())) {
+                if (!world.isSkyVisible(testPos.down())) { // Check the block position, not the entity position
                     // Not truly exposed to sky
                     // Check if we're over liquid - if so, this is considered "exposed" for our purposes
                     if (!isOverLiquidSurface(data, world, x, z)) {
@@ -227,8 +301,8 @@ public class PositionFinder {
                 totalAttempts++;
             }
 
-            // For non-EXPOSED modes, also check different Y levels
-            if (!heightMode.equals(HEIGHT_EXPOSED) && totalAttempts < maxAttempts) {
+            // For fixed and relative modes, also check different Y levels
+            if ((heightMode.equals(HEIGHT_FIXED) || heightMode.equals(HEIGHT_RELATIVE)) && totalAttempts < maxAttempts) {
                 for (int yOffset = -8; yOffset <= 8; yOffset += 4) {
                     if (totalAttempts >= maxAttempts) break;
 
@@ -254,7 +328,7 @@ public class PositionFinder {
 
     private Vec3d getOppositeHeightFallback(SerializableData.Instance data, ServerWorld world,
                                             int x, int z, String originalMode, double preferredY) {
-        if (originalMode.equals(HEIGHT_EXPOSED)) {
+        if (originalMode.equals(HEIGHT_EXPOSED) || originalMode.equals(HEIGHT_FIXED)) {
             // Fallback to unexposed
             return findSafeHeightPosition(data, world, x, z, HEIGHT_UNEXPOSED, preferredY, false);
         } else if (originalMode.equals(HEIGHT_UNEXPOSED)) {

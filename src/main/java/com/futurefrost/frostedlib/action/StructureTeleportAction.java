@@ -20,13 +20,13 @@ public class StructureTeleportAction extends BaseTeleportAction {
     private static final SerializableData DATA;
 
     static {
-        // Start with common data
-        DATA = createCommonData()
+        // Start with common data with "exposed" default
+        DATA = createCommonDataWithExposedDefault()
                 // Add specific fields for structure teleport
                 .add("structure_id", SerializableDataTypes.IDENTIFIER)
                 .add("chunk_search_radius", SerializableDataTypes.INT, 64)
                 .add("scale_factor", SerializableDataTypes.DOUBLE, 1.0)
-                .add("target_y", SerializableDataTypes.DOUBLE, null);
+                .add("target_y", SerializableDataTypes.DOUBLE, null);  // Optional
     }
 
     @Override
@@ -44,20 +44,54 @@ public class StructureTeleportAction extends BaseTeleportAction {
         }
 
         int searchRadius = data.getInt("chunk_search_radius");
+        double scaleFactor = data.getDouble("scale_factor");
+
+        // Calculate search start position using scale factor
+        BlockPos searchStartPos = calculateScaledSearchPosition(entity, world, scaleFactor);
+
         TagKey<Structure> structureTagKey = TagKey.of(RegistryKeys.STRUCTURE, structureId);
 
+        // Search for structure from the scaled position in the target dimension
         BlockPos structurePos = world.locateStructure(
                 structureTagKey,
-                entity.getBlockPos(),
+                searchStartPos,
                 searchRadius,
                 false
         );
 
         if (structurePos == null) {
-            throw new RuntimeException("Could not find structure: " + structureId + " within " + searchRadius + " chunks.");
+            // Try alternative search method
+            structurePos = findStructureAlternative(world, structureId, searchStartPos, searchRadius);
+
+            if (structurePos == null) {
+                throw new RuntimeException("Could not find structure: " + structureId +
+                        " within " + searchRadius + " chunks of position " + searchStartPos.toShortString() +
+                        " in dimension " + world.getRegistryKey().getValue());
+            }
         }
 
+        // Return structure position
         return new Vec3d(structurePos.getX() + 0.5, structurePos.getY(), structurePos.getZ() + 0.5);
+    }
+
+    private BlockPos findStructureAlternative(ServerWorld world, Identifier structureId, BlockPos searchStart, int radius) {
+        // Alternative search method if the primary one fails
+        try {
+            // Try with a different tag format
+            TagKey<Structure> altTag = TagKey.of(RegistryKeys.STRUCTURE,
+                    new Identifier(structureId.getNamespace(), structureId.getPath() + "s"));
+
+            return world.locateStructure(altTag, searchStart, radius, false);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Override
+    protected Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
+        double scaleFactor = data.getDouble("scale_factor");
+        BlockPos scaledPos = calculateScaledSearchPosition(entity, targetWorld, scaleFactor);
+        return Vec3d.ofCenter(scaledPos);
     }
 
     @Override

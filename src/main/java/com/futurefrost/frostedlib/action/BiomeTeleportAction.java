@@ -22,13 +22,13 @@ public class BiomeTeleportAction extends BaseTeleportAction {
     private static final SerializableData DATA;
 
     static {
-        // Start with common data
-        DATA = createCommonData()
+        // Start with common data with "exposed" default
+        DATA = createCommonDataWithExposedDefault()
                 // Add specific fields for biome teleport
                 .add("biome_id", SerializableDataTypes.IDENTIFIER)
                 .add("chunk_search_radius", SerializableDataTypes.INT, 64)
                 .add("scale_factor", SerializableDataTypes.DOUBLE, 1.0)
-                .add("target_y", SerializableDataTypes.DOUBLE, null);
+                .add("target_y", SerializableDataTypes.DOUBLE, null);  // Optional
     }
 
     @Override
@@ -49,21 +49,37 @@ public class BiomeTeleportAction extends BaseTeleportAction {
 
         RegistryEntry<Biome> targetBiome = biomeEntry.get();
         int searchRadius = data.getInt("chunk_search_radius");
+        double scaleFactor = data.getDouble("scale_factor");
 
+        // Calculate search start position using scale factor
+        BlockPos searchStartPos = calculateScaledSearchPosition(entity, world, scaleFactor);
+
+        // Search for biome from the scaled position in the target dimension
         var biomeResult = world.locateBiome(
                 biome -> biome.equals(targetBiome),
-                entity.getBlockPos(),
+                searchStartPos,
                 searchRadius * 16,
                 8,
                 64
         );
 
         if (biomeResult == null) {
-            throw new RuntimeException("Could not find biome: " + biomeId + " within " + searchRadius + " chunks.");
+            throw new RuntimeException("Could not find biome: " + biomeId +
+                    " within " + searchRadius + " chunks of position " + searchStartPos.toShortString() +
+                    " in dimension " + world.getRegistryKey().getValue());
         }
 
         BlockPos biomePos = biomeResult.getFirst();
+
+        // Return biome position
         return new Vec3d(biomePos.getX() + 0.5, biomePos.getY(), biomePos.getZ() + 0.5);
+    }
+
+    @Override
+    protected Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
+        double scaleFactor = data.getDouble("scale_factor");
+        BlockPos scaledPos = calculateScaledSearchPosition(entity, targetWorld, scaleFactor);
+        return Vec3d.ofCenter(scaledPos);
     }
 
     @Override

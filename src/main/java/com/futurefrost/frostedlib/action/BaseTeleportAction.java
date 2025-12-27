@@ -12,6 +12,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
@@ -19,8 +20,8 @@ import java.util.Random;
 
 public abstract class BaseTeleportAction {
 
-    // Method to create common data for all teleport actions
-    protected static SerializableData createCommonData() {
+    // Method to create common data for all teleport actions WITHOUT target_height default
+    protected static SerializableData createCommonDataWithoutHeightDefault() {
         return new SerializableData()
                 .add("target_dimension", SerializableDataTypes.IDENTIFIER, null)
                 .add("bring_mount", SerializableDataTypes.BOOLEAN, true)
@@ -33,11 +34,17 @@ public abstract class BaseTeleportAction {
                 .add("random_offset", SerializableDataTypes.DOUBLE, 0.0)
                 .add("search_radius", SerializableDataTypes.INT, 32)
                 .add("show_message", SerializableDataTypes.BOOLEAN, false)
-                .add("target_height", SerializableDataTypes.STRING, "exposed")
+                .add("target_height", SerializableDataTypes.STRING, null)  // No default here - let subclasses define
                 .add("strict_height", SerializableDataTypes.BOOLEAN, false)
                 .add("liquids_safe", SerializableDataTypes.BOOLEAN, false)
                 .add("liquid_condition", ApoliDataTypes.BLOCK_CONDITION, null)
                 .add("error_message", SerializableDataTypes.STRING, null);
+    }
+
+    // Method for actions that want "exposed" as default (relative, biome, structure)
+    protected static SerializableData createCommonDataWithExposedDefault() {
+        return createCommonDataWithoutHeightDefault()
+                .add("target_height", SerializableDataTypes.STRING, "exposed");  // Add default for these actions
     }
 
     protected final ErrorHandler errorHandler;
@@ -54,6 +61,9 @@ public abstract class BaseTeleportAction {
 
     // Template method pattern - subclasses implement specific logic
     protected abstract Vec3d calculateTargetPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld);
+
+    // New method for dimension-aware position calculation
+    protected abstract Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld);
 
     protected abstract SerializableData getData();
 
@@ -154,5 +164,30 @@ public abstract class BaseTeleportAction {
                     "Teleported within " + targetWorld.getRegistryKey().getValue();
             player.sendMessage(Text.literal(message), false);
         }
+    }
+
+    // Helper method to calculate scaled position for dimension search
+    protected BlockPos calculateScaledSearchPosition(Entity entity, ServerWorld targetWorld, double scaleFactor) {
+        // Get entity's current position
+        Vec3d currentPos = entity.getPos();
+
+        // Apply scale factor to get position in target dimension
+        double scaledX = currentPos.x * scaleFactor;
+        double scaledZ = currentPos.z * scaleFactor;
+
+        // Get a reasonable Y level for searching
+        int searchY = targetWorld.getSeaLevel();
+
+        return new BlockPos((int) scaledX, searchY, (int) scaledZ);
+    }
+
+    // Default implementation for search start position (for relative teleport)
+    protected Vec3d defaultSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
+        double scale = data.getDouble("scale_factor");
+        return new Vec3d(
+                entity.getX() * scale,
+                entity.getY(),
+                entity.getZ() * scale
+        );
     }
 }

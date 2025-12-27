@@ -14,28 +14,38 @@ public class RelativeTeleportAction extends BaseTeleportAction {
     private static final SerializableData DATA;
 
     static {
-        // Start with common data
-        DATA = createCommonData()
+        // Start with common data with "exposed" default
+        DATA = createCommonDataWithExposedDefault()
                 // Add specific fields for relative teleport
                 .add("scale_factor", SerializableDataTypes.DOUBLE, 1.0)
-                .add("target_y", SerializableDataTypes.DOUBLE, null);
+                .add("target_y", SerializableDataTypes.DOUBLE, null);  // Optional - if specified, overrides target_height behavior
     }
 
     @Override
     protected Vec3d calculateTargetPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
         double scale = data.getDouble("scale_factor");
-        double targetY = entity.getY();
+        Double targetY = data.get("target_y");
 
-        // Check if target_y is specified for fixed height mode
-        if (data.isPresent("target_y")) {
-            targetY = data.getDouble("target_y");
+        if (targetY != null) {
+            // If target_y is specified, use it
+            return new Vec3d(
+                    entity.getX() * scale,
+                    targetY,
+                    entity.getZ() * scale
+            );
+        } else {
+            // If no target_y, use entity's Y
+            return new Vec3d(
+                    entity.getX() * scale,
+                    entity.getY(),
+                    entity.getZ() * scale
+            );
         }
+    }
 
-        return new Vec3d(
-                entity.getX() * scale,
-                targetY,
-                entity.getZ() * scale
-        );
+    @Override
+    protected Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
+        return defaultSearchStartPosition(data, entity, targetWorld);
     }
 
     @Override
