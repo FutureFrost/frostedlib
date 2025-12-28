@@ -6,10 +6,6 @@ import net.minecraft.util.math.BlockPos;
 
 public class DimensionSearchHelper {
 
-    /**
-     * Calculate the starting position for biome/structure search in target dimension.
-     * Applies scale_factor to current coordinates when teleporting cross-dimension.
-     */
     public static BlockPos calculateSearchStartPosition(Entity entity, ServerWorld targetWorld, double scaleFactor) {
         // Check if we're changing dimensions
         boolean isChangingDimension = !entity.getWorld().getRegistryKey().equals(targetWorld.getRegistryKey());
@@ -48,9 +44,6 @@ public class DimensionSearchHelper {
         }
     }
 
-    /**
-     * Enhanced version that handles dimension-specific scaling (like Nether's 8:1 ratio)
-     */
     public static BlockPos calculateSearchStartPosition(Entity entity, ServerWorld targetWorld,
                                                         double scaleFactor, boolean useDimensionScaling) {
         BlockPos basePos = calculateSearchStartPosition(entity, targetWorld, scaleFactor);

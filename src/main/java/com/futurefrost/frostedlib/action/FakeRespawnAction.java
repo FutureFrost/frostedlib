@@ -154,11 +154,6 @@ public class FakeRespawnAction {
                 }
             }
         } else {
-            // NON-PLAYER ENTITY LOGIC
-            // For non-players, we can either:
-            // 1. Teleport to world spawn
-            // 2. Teleport to entity's home/starting position
-            // 3. Do nothing
 
             targetWorld = server.getOverworld();
             spawnLocation = Vec3d.ofBottomCenter(targetWorld.getSpawnPos());

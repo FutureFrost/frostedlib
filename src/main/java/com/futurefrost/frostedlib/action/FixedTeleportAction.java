@@ -14,7 +14,6 @@ public class FixedTeleportAction extends BaseTeleportAction {
     private static final SerializableData DATA;
 
     static {
-        // Start with common data but override target_height default
         DATA = new SerializableData()
                 // Core Targeting
                 .add("target_dimension", SerializableDataTypes.IDENTIFIER, null)

@@ -367,7 +367,7 @@ public class PositionFinder {
         return feetSafe && headSafe && groundSolid;
     }
 
-    private boolean isPositionActuallySafe(SerializableData.Instance data, ServerWorld world, Vec3d pos) {
+    public boolean isPositionActuallySafe(SerializableData.Instance data, ServerWorld world, Vec3d pos) {
         return isPositionSafeForEntity(data, world, (int) pos.x, (int) pos.y, (int) pos.z);
     }
 
