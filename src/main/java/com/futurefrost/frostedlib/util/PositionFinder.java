@@ -401,6 +401,7 @@ public class PositionFinder {
             net.minecraft.fluid.Fluid fluid = fluidState.getFluid();
 
             // Default unsafe fluids (when no condition is specified)
+            // Needs to be redone to automatically consider modded liquids.
             if (fluid == Fluids.WATER ||
                     fluid == Fluids.FLOWING_WATER ||
                     fluid == Fluids.LAVA ||

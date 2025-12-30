@@ -1,5 +1,6 @@
 package com.futurefrost.frostedlib.action;
 
+import com.futurefrost.frostedlib.FrostedLib;
 import com.futurefrost.frostedlib.util.*;
 import io.github.apace100.apoli.data.ApoliDataTypes;
 import io.github.apace100.calio.data.SerializableData;
@@ -72,85 +73,102 @@ public abstract class BaseTeleportAction {
     protected abstract SerializableData getData();
 
     public void execute(SerializableData.Instance data, Entity entity) {
+        // Return early if on client side
+        if (entity.getWorld().isClient) {
+            return;
+        }
+
+        // Now we know we're on server side, so getServer() should not be null
         if (entity.getServer() == null) {
-            errorHandler.handleRuntimeError(data, entity, new RuntimeException("Entity server is null"));
+            // This is unexpected on server side, log warning
+            FrostedLib.LOGGER.warn("Entity server is null on server side for teleport action");
             return;
         }
 
         try {
-            // 1. Get target dimension
-            ServerWorld targetWorld = getTargetWorld(data, entity);
-            if (targetWorld == null) {
-                RegistryKey<World> dimensionKey = getTargetDimensionKey(data, entity);
-                errorHandler.handleDimensionNotFound(data, entity, dimensionKey);
+
+            if (entity.getServer() == null) {
+                errorHandler.handleRuntimeError(data, entity, new RuntimeException("Entity server is null"));
                 return;
             }
 
-            // 2. Calculate base position (subclass-specific)
-            Vec3d basePosition;
             try {
-                basePosition = calculateTargetPosition(data, entity, targetWorld);
-            } catch (IllegalArgumentException e) {
-                errorHandler.handleValidationError(data, entity, e.getMessage());
-                return;
-            } catch (RuntimeException e) {
-                String errorMsg = e.getMessage();
-                if (errorMsg.contains("biome")) {
-                    errorHandler.handleBiomeNotFound(data, entity, errorMsg);
-                } else if (errorMsg.contains("structure")) {
-                    errorHandler.handleStructureNotFound(data, entity, errorMsg);
-                } else {
-                    errorHandler.handleRuntimeError(data, entity, e);
+                // 1. Get target dimension
+                ServerWorld targetWorld = getTargetWorld(data, entity);
+                if (targetWorld == null) {
+                    RegistryKey<World> dimensionKey = getTargetDimensionKey(data, entity);
+                    errorHandler.handleDimensionNotFound(data, entity, dimensionKey);
+                    return;
                 }
-                return;
+
+                // 2. Calculate base position (subclass-specific)
+                Vec3d basePosition;
+                try {
+                    basePosition = calculateTargetPosition(data, entity, targetWorld);
+                } catch (IllegalArgumentException e) {
+                    errorHandler.handleValidationError(data, entity, e.getMessage());
+                    return;
+                } catch (RuntimeException e) {
+                    String errorMsg = e.getMessage();
+                    if (errorMsg.contains("biome")) {
+                        errorHandler.handleBiomeNotFound(data, entity, errorMsg);
+                    } else if (errorMsg.contains("structure")) {
+                        errorHandler.handleStructureNotFound(data, entity, errorMsg);
+                    } else {
+                        errorHandler.handleRuntimeError(data, entity, e);
+                    }
+                    return;
+                }
+
+                // 3. Check if we need height adjustment (only for relative/fixed teleports)
+                String className = this.getClass().getSimpleName();
+                Vec3d finalPosition;
+
+                if (className.contains("StructureTeleportAction") || className.contains("BiomeTeleportAction")) {
+                    // For structure/biome teleports, use position as-is (should already be safe)
+                    finalPosition = basePosition;
+                } else {
+                    // For relative/fixed teleports, apply height adjustment if specified
+                    finalPosition = applyTargetHeightAsSecondary(data, entity, targetWorld, basePosition);
+                }
+
+                // 4. Apply random offset (if any)
+                Vec3d randomizedPosition = applyRandomOffset(data, finalPosition);
+
+                // 5. Find safe position (with height already considered for relative/fixed)
+                Vec3d safePosition;
+
+                if (className.contains("StructureTeleportAction") || className.contains("BiomeTeleportAction")) {
+                    // Structure/biome teleports should already have safe positions
+                    safePosition = randomizedPosition;
+                } else {
+                    // Relative/fixed teleports need to find safe position
+                    safePosition = positionFinder.findSafePosition(
+                            data, entity, targetWorld,
+                            (int) randomizedPosition.x, (int) randomizedPosition.z
+                    );
+                }
+
+                if (safePosition == null) {
+                    errorHandler.handleNoSafePosition(data, entity, basePosition, targetWorld.getRegistryKey());
+                    return;
+                }
+
+                // 6. Handle teleport with mount
+                boolean success = mountHandler.teleportWithMount(entity, targetWorld, safePosition,
+                        data.getBoolean("bring_mount"));
+
+                if (!success) {
+                    errorHandler.handleTeleportFailed(data, entity, safePosition, targetWorld.getRegistryKey());
+                    return;
+                }
+
+                // 7. Show success message
+                showSuccessMessage(data, entity, targetWorld);
+
+            } catch (Exception e) {
+                errorHandler.handleRuntimeError(data, entity, e);
             }
-
-            // 3. Check if we need height adjustment (only for relative/fixed teleports)
-            String className = this.getClass().getSimpleName();
-            Vec3d finalPosition;
-
-            if (className.contains("StructureTeleportAction") || className.contains("BiomeTeleportAction")) {
-                // For structure/biome teleports, use position as-is (should already be safe)
-                finalPosition = basePosition;
-            } else {
-                // For relative/fixed teleports, apply height adjustment if specified
-                finalPosition = applyTargetHeightAsSecondary(data, entity, targetWorld, basePosition);
-            }
-
-            // 4. Apply random offset (if any)
-            Vec3d randomizedPosition = applyRandomOffset(data, finalPosition);
-
-            // 5. Find safe position (with height already considered for relative/fixed)
-            Vec3d safePosition;
-
-            if (className.contains("StructureTeleportAction") || className.contains("BiomeTeleportAction")) {
-                // Structure/biome teleports should already have safe positions
-                safePosition = randomizedPosition;
-            } else {
-                // Relative/fixed teleports need to find safe position
-                safePosition = positionFinder.findSafePosition(
-                        data, entity, targetWorld,
-                        (int) randomizedPosition.x, (int) randomizedPosition.z
-                );
-            }
-
-            if (safePosition == null) {
-                errorHandler.handleNoSafePosition(data, entity, basePosition, targetWorld.getRegistryKey());
-                return;
-            }
-
-            // 6. Handle teleport with mount
-            boolean success = mountHandler.teleportWithMount(entity, targetWorld, safePosition,
-                    data.getBoolean("bring_mount"));
-
-            if (!success) {
-                errorHandler.handleTeleportFailed(data, entity, safePosition, targetWorld.getRegistryKey());
-                return;
-            }
-
-            // 7. Show success message
-            showSuccessMessage(data, entity, targetWorld);
-
         } catch (Exception e) {
             errorHandler.handleRuntimeError(data, entity, e);
         }
