@@ -5,6 +5,7 @@ import com.futurefrost.frostedlib.util.*;
 import io.github.apace100.apoli.data.ApoliDataTypes;
 import io.github.apace100.calio.data.SerializableData;
 import io.github.apace100.calio.data.SerializableDataTypes;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
@@ -16,6 +17,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
+import java.util.Objects;
 import java.util.Random;
 
 public abstract class BaseTeleportAction {
@@ -47,12 +49,6 @@ public abstract class BaseTeleportAction {
                 .add("target_height", SerializableDataTypes.STRING, "exposed");  // Add default
     }
 
-    // Method for fixed teleport with "fixed" as default
-    protected static SerializableData createCommonDataWithFixedDefault() {
-        return createCommonDataWithoutHeightDefault()
-                .add("target_height", SerializableDataTypes.STRING, "fixed");  // Add default
-    }
-
     protected final ErrorHandler errorHandler;
     protected final PositionFinder positionFinder;
     protected final PlatformGenerator platformGenerator;
@@ -67,10 +63,6 @@ public abstract class BaseTeleportAction {
 
     // Template method pattern - subclasses implement specific logic
     protected abstract Vec3d calculateTargetPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld);
-
-    protected abstract Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld);
-
-    protected abstract SerializableData getData();
 
     public void execute(SerializableData.Instance data, Entity entity) {
         // Return early if on client side
@@ -150,7 +142,7 @@ public abstract class BaseTeleportAction {
                 }
 
                 if (safePosition == null) {
-                    errorHandler.handleNoSafePosition(data, entity, basePosition, targetWorld.getRegistryKey());
+                    errorHandler.handleNoSafePosition(data, entity);
                     return;
                 }
 
@@ -159,7 +151,7 @@ public abstract class BaseTeleportAction {
                         data.getBoolean("bring_mount"));
 
                 if (!success) {
-                    errorHandler.handleTeleportFailed(data, entity, safePosition, targetWorld.getRegistryKey());
+                    errorHandler.handleTeleportFailed(data, entity);
                     return;
                 }
 
@@ -177,7 +169,7 @@ public abstract class BaseTeleportAction {
     // Common helper methods
     protected ServerWorld getTargetWorld(SerializableData.Instance data, Entity entity) {
         RegistryKey<World> dimensionKey = getTargetDimensionKey(data, entity);
-        return entity.getServer().getWorld(dimensionKey);
+        return Objects.requireNonNull(entity.getServer()).getWorld(dimensionKey);
     }
 
     protected RegistryKey<World> getTargetDimensionKey(SerializableData.Instance data, Entity entity) {
@@ -223,16 +215,6 @@ public abstract class BaseTeleportAction {
         return new BlockPos((int) scaledX, searchY, (int) scaledZ);
     }
 
-    // Default implementation for search start position (for relative teleport)
-    protected Vec3d defaultSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
-        double scale = data.getDouble("scale_factor");
-        return new Vec3d(
-                entity.getX() * scale,
-                entity.getY(),
-                entity.getZ() * scale
-        );
-    }
-
     // Apply target_height as secondary condition (only for relative/fixed teleports)
     protected Vec3d applyTargetHeightAsSecondary(SerializableData.Instance data, Entity entity,
                                                  ServerWorld targetWorld, Vec3d basePosition) {
@@ -266,19 +248,19 @@ public abstract class BaseTeleportAction {
 
         // If we found a position with the desired height, use it
         if (heightAdjustedPos != null &&
-                isPositionActuallySafe(data, targetWorld, heightAdjustedPos)) {
+                positionFinder.isPositionActuallySafe(data, targetWorld, heightAdjustedPos)) {
             return heightAdjustedPos;
         }
 
         // Otherwise try expanding search
         Vec3d expandedPos = findHeightAdjustedPositionWithSearch(
-                data, entity, targetWorld, centerX, centerZ, heightMode, preferredY, strictHeight
+                data, targetWorld, centerX, centerZ, heightMode, preferredY, strictHeight
         );
 
         return expandedPos != null ? expandedPos : basePosition;
     }
 
-    private Vec3d findHeightAdjustedPositionWithSearch(SerializableData.Instance data, Entity entity,
+    private Vec3d findHeightAdjustedPositionWithSearch(SerializableData.Instance data,
                                                        ServerWorld world, int centerX, int centerZ,
                                                        String heightMode, double preferredY, boolean strictHeight) {
         int maxSearchRadius = Math.min(data.getInt("search_radius"), 32);
@@ -299,7 +281,7 @@ public abstract class BaseTeleportAction {
                         data, world, x, z, heightMode, preferredY, strictHeight
                 );
 
-                if (testPos != null && isPositionActuallySafe(data, world, testPos)) {
+                if (testPos != null && positionFinder.isPositionActuallySafe(data, world, testPos)) {
                     return testPos;
                 }
 
@@ -310,7 +292,19 @@ public abstract class BaseTeleportAction {
         return null;
     }
 
-    private boolean isPositionActuallySafe(SerializableData.Instance data, ServerWorld world, Vec3d pos) {
-        return positionFinder.isPositionActuallySafe(data, world, pos);
+    public boolean isPositionSafeForEntity(ServerWorld world, BlockPos pos) {
+        BlockPos feetPos = pos;
+        BlockPos headPos = pos.up();
+        BlockPos groundPos = pos.down();
+
+        BlockState feetState = world.getBlockState(feetPos);
+        BlockState headState = world.getBlockState(headPos);
+        BlockState groundState = world.getBlockState(groundPos);
+
+        boolean feetSafe = feetState.isAir() || !feetState.isOpaque();
+        boolean headSafe = headState.isAir() || !headState.isOpaque();
+        boolean groundSolid = groundState.isSolidBlock(world, groundPos);
+
+        return feetSafe && headSafe && groundSolid;
     }
 }

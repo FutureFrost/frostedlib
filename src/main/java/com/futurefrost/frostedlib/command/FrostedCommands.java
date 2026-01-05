@@ -12,8 +12,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.block.BedBlock;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.RespawnAnchorBlock;
-import net.minecraft.command.CommandSource;
-import net.minecraft.command.EntitySelector;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -26,12 +24,13 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.world.World;
 
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.futurefrost.frostedlib.util.NbtHelper.getSavedPosition;
 
 public class FrostedCommands {
 
@@ -62,7 +61,7 @@ public class FrostedCommands {
                         .then(CommandManager.argument("target", EntityArgumentType.entity())
                                 .executes(FrostedCommands::listPositions)
                         )
-                        .executes(context -> listPositionsForExecutor(context))
+                        .executes(FrostedCommands::listPositionsForExecutor)
                 )
 
                 // Clear command: /frostedlib clear <target>
@@ -70,15 +69,7 @@ public class FrostedCommands {
                         .then(CommandManager.argument("target", EntityArgumentType.entity())
                                 .executes(FrostedCommands::clearPositions)
                         )
-                        .executes(context -> clearPositionsForExecutor(context))
-                )
-
-                // Debug command: /frostedlib debug <target>
-                .then(CommandManager.literal("debug")
-                        .then(CommandManager.argument("target", EntityArgumentType.entity())
-                                .executes(FrostedCommands::debugData)
-                        )
-                        .executes(context -> debugDataForExecutor(context))
+                        .executes(FrostedCommands::clearPositionsForExecutor)
                 )
         );
     }
@@ -102,12 +93,11 @@ public class FrostedCommands {
             if (entity instanceof ServerPlayerEntity player) {
                 PlayerDataComponent data = ModComponents.PLAYER_DATA.get(player);
                 data.savePosition(id, pos);
-                successCount++;
             } else {
                 EntityDataComponent data = ModComponents.ENTITY_DATA.get(entity);
                 data.savePosition(id, pos);
-                successCount++;
             }
+            successCount++;
         }
 
         if (successCount > 0) {
@@ -135,16 +125,8 @@ public class FrostedCommands {
         for (Entity entity : targets) {
             boolean success = false;
 
-            // Try to get saved position
-            Optional<PositionData> optionalPos = Optional.empty();
-
-            if (entity instanceof ServerPlayerEntity player) {
-                PlayerDataComponent data = ModComponents.PLAYER_DATA.get(player);
-                optionalPos = data.getPosition(id);
-            } else {
-                EntityDataComponent data = ModComponents.ENTITY_DATA.get(entity);
-                optionalPos = data.getPosition(id);
-            }
+            // Get position data from appropriate component
+            Optional<PositionData> optionalPos = getSavedPosition(entity, id);
 
             if (optionalPos.isPresent()) {
                 // Teleport to saved position
@@ -220,7 +202,7 @@ public class FrostedCommands {
 
         boolean hasValidSpawnPoint = false;
         ServerWorld targetWorld = null;
-        Vec3d spawnLocation = null;
+        Vec3d spawnLocation;
 
         if (spawnBlockPos != null && spawnDimension != null) {
             targetWorld = server.getWorld(spawnDimension);
@@ -242,12 +224,12 @@ public class FrostedCommands {
             }
         }
 
-        if (!hasValidSpawnPoint || targetWorld == null) {
+        if (!hasValidSpawnPoint) {
             targetWorld = server.getOverworld();
             spawnBlockPos = targetWorld.getSpawnPos();
         }
 
-        if (hasValidSpawnPoint && spawnBlockPos != null) {
+        if (hasValidSpawnPoint) {
             Optional<Vec3d> safeSpawn = PlayerEntity.findRespawnPosition(
                     targetWorld,
                     spawnBlockPos,
@@ -381,26 +363,4 @@ public class FrostedCommands {
         return clearPositions(context);
     }
 
-    private static int debugData(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        Entity target = EntityArgumentType.getEntity(context, "target");
-
-        // Simplified debug for now
-        source.sendFeedback(() ->
-                        Text.literal("Debug info for " + target.getName().getString() +
-                                " (UUID: " + target.getUuidAsString() + ")"),
-                false
-        );
-
-        return 1;
-    }
-
-    private static int debugDataForExecutor(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        if (source.getEntity() == null) {
-            source.sendError(Text.literal("You must specify a target or be an entity"));
-            return 0;
-        }
-        return debugData(context);
-    }
 }

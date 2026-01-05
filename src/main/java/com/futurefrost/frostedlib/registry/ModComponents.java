@@ -13,18 +13,20 @@ import dev.onyxstudios.cca.api.v3.entity.RespawnCopyStrategy;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.Identifier;
 
+import java.util.Objects;
+
 public class ModComponents implements EntityComponentInitializer {
     // Player data component
     public static final ComponentKey<PlayerDataComponent> PLAYER_DATA =
             ComponentRegistry.getOrCreate(
-                    Identifier.of(FrostedLib.MOD_ID, "player_data"),
+                    Objects.requireNonNull(Identifier.of(FrostedLib.MOD_ID, "player_data")),
                     PlayerDataComponent.class
             );
 
     // Entity data component (for all entities)
     public static final ComponentKey<EntityDataComponent> ENTITY_DATA =
             ComponentRegistry.getOrCreate(
-                    Identifier.of(FrostedLib.MOD_ID, "entity_data"),
+                    Objects.requireNonNull(Identifier.of(FrostedLib.MOD_ID, "entity_data")),
                     EntityDataComponent.class
             );
 

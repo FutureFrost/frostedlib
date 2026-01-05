@@ -39,9 +39,8 @@ public class FrostedLib implements ModInitializer {
 			LOGGER.error("Failed to Register Action Types", e);
 		}
 
-		// Register commands HERE instead of in server initializer
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-			LOGGER.info("Registering FrostedLib Commands on Client!");
+			LOGGER.info("Registering FrostedLib Commands!");
 			FrostedCommands.register(dispatcher);
 		});
 

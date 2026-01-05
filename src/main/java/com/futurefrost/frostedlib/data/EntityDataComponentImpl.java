@@ -1,7 +1,8 @@
 package com.futurefrost.frostedlib.data;
 
+import com.futurefrost.frostedlib.util.NbtHelper;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,32 +37,12 @@ public class EntityDataComponentImpl implements EntityDataComponent {
     }
 
     @Override
-    public void readFromNbt(NbtCompound nbt) {
-        savedPositions.clear();
-
-        if (nbt.contains("saved_positions")) {
-            NbtList positionsList = nbt.getList("saved_positions", NbtCompound.COMPOUND_TYPE);
-
-            for (int i = 0; i < positionsList.size(); i++) {
-                NbtCompound entryNbt = positionsList.getCompound(i);
-                String id = entryNbt.getString("id");
-                PositionData position = PositionData.fromNbt(entryNbt.getCompound("position"));
-                savedPositions.put(id, position);
-            }
-        }
+    public void readFromNbt(@NotNull NbtCompound nbt) {
+        NbtHelper.readSavedPositionsFromNbt(nbt, savedPositions);
     }
 
     @Override
-    public void writeToNbt(NbtCompound nbt) {
-        NbtList positionsList = new NbtList();
-
-        for (Map.Entry<String, PositionData> entry : savedPositions.entrySet()) {
-            NbtCompound entryNbt = new NbtCompound();
-            entryNbt.putString("id", entry.getKey());
-            entryNbt.put("position", entry.getValue().toNbt());
-            positionsList.add(entryNbt);
-        }
-
-        nbt.put("saved_positions", positionsList);
+    public void writeToNbt(@NotNull NbtCompound nbt) {
+        NbtHelper.writeSavedPositionsToNbt(nbt, savedPositions);
     }
 }

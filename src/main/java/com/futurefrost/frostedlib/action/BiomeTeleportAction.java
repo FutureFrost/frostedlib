@@ -139,34 +139,6 @@ public class BiomeTeleportAction extends BaseTeleportAction {
         return null;
     }
 
-    private boolean isPositionSafeForEntity(ServerWorld world, BlockPos pos) {
-        BlockPos feetPos = pos;
-        BlockPos headPos = pos.up();
-        BlockPos groundPos = pos.down();
-
-        BlockState feetState = world.getBlockState(feetPos);
-        BlockState headState = world.getBlockState(headPos);
-        BlockState groundState = world.getBlockState(groundPos);
-
-        boolean feetSafe = feetState.isAir() || !feetState.isOpaque();
-        boolean headSafe = headState.isAir() || !headState.isOpaque();
-        boolean groundSolid = groundState.isSolidBlock(world, groundPos);
-
-        return feetSafe && headSafe && groundSolid;
-    }
-
-    @Override
-    protected Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
-        double scaleFactor = data.getDouble("scale_factor");
-        BlockPos scaledPos = calculateScaledSearchPosition(entity, targetWorld, scaleFactor);
-        return Vec3d.ofCenter(scaledPos);
-    }
-
-    @Override
-    protected SerializableData getData() {
-        return DATA;
-    }
-
     public static ActionFactory<Entity> getFactory() {
         return new ActionFactory<>(
                 Identifier.of("frostedlib", "biome_teleport"),

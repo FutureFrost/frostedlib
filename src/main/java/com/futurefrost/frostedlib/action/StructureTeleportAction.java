@@ -4,13 +4,11 @@ import io.github.apace100.apoli.data.ApoliDataTypes;
 import io.github.apace100.apoli.power.factory.action.ActionFactory;
 import io.github.apace100.calio.data.SerializableData;
 import io.github.apace100.calio.data.SerializableDataTypes;
-import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.*;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.registry.tag.TagKey;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.structure.StructureStart;
 import net.minecraft.util.Identifier;
@@ -178,34 +176,6 @@ public class StructureTeleportAction extends BaseTeleportAction {
         }
 
         return null;
-    }
-
-    private boolean isPositionSafeForEntity(ServerWorld world, BlockPos pos) {
-        BlockPos feetPos = pos;
-        BlockPos headPos = pos.up();
-        BlockPos groundPos = pos.down();
-
-        BlockState feetState = world.getBlockState(feetPos);
-        BlockState headState = world.getBlockState(headPos);
-        BlockState groundState = world.getBlockState(groundPos);
-
-        boolean feetSafe = feetState.isAir() || !feetState.isOpaque();
-        boolean headSafe = headState.isAir() || !headState.isOpaque();
-        boolean groundSolid = groundState.isSolidBlock(world, groundPos);
-
-        return feetSafe && headSafe && groundSolid;
-    }
-
-    @Override
-    protected Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
-        double scaleFactor = data.getDouble("scale_factor");
-        BlockPos scaledPos = calculateScaledSearchPosition(entity, targetWorld, scaleFactor);
-        return Vec3d.ofCenter(scaledPos);
-    }
-
-    @Override
-    protected SerializableData getData() {
-        return DATA;
     }
 
     public static ActionFactory<Entity> getFactory() {

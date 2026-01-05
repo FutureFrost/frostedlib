@@ -1,7 +1,6 @@
 package com.futurefrost.frostedlib.data;
 
 import dev.onyxstudios.cca.api.v3.component.Component;
-import net.minecraft.nbt.NbtCompound;
 
 import java.util.Map;
 import java.util.Optional;

@@ -2,7 +2,6 @@ package com.futurefrost.frostedlib.action;
 
 import com.futurefrost.frostedlib.FrostedLib;
 import com.futurefrost.frostedlib.util.TeleportHelper;
-import io.github.apace100.apoli.data.ApoliDataTypes;
 import io.github.apace100.apoli.power.factory.action.ActionFactory;
 import io.github.apace100.calio.data.SerializableData;
 import io.github.apace100.calio.data.SerializableDataTypes;
@@ -73,13 +72,13 @@ public class FakeRespawnAction {
                     }
                 }
 
-                if (!hasValidSetSpawn || targetWorld == null) {
+                if (!hasValidSetSpawn) {
                     targetWorld = server.getOverworld();
                     spawnBlockPos = targetWorld.getSpawnPos();
                     spawnType = "world spawn";
                 }
 
-                if (hasValidSetSpawn && spawnBlockPos != null) {
+                if (hasValidSetSpawn) {
                     Optional<Vec3d> safeSpawn = net.minecraft.entity.player.PlayerEntity.findRespawnPosition(
                             targetWorld,
                             spawnBlockPos,

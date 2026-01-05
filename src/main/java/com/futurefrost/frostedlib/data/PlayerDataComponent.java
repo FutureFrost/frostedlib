@@ -1,9 +1,6 @@
 package com.futurefrost.frostedlib.data;
 
 import dev.onyxstudios.cca.api.v3.component.Component;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.util.Identifier;
 
 import java.util.Map;
 import java.util.Optional;

@@ -1,6 +1,5 @@
 package com.futurefrost.frostedlib.action;
 
-import io.github.apace100.apoli.data.ApoliDataTypes;
 import io.github.apace100.apoli.power.factory.action.ActionFactory;
 import io.github.apace100.calio.data.SerializableData;
 import io.github.apace100.calio.data.SerializableDataTypes;
@@ -8,6 +7,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
+
+import java.util.Objects;
 
 public class RelativeTeleportAction extends BaseTeleportAction {
 
@@ -26,31 +27,13 @@ public class RelativeTeleportAction extends BaseTeleportAction {
         double scale = data.getDouble("scale_factor");
         Double targetY = data.get("target_y");
 
-        if (targetY != null) {
-            // If target_y is specified, use it
-            return new Vec3d(
-                    entity.getX() * scale,
-                    targetY,
-                    entity.getZ() * scale
-            );
-        } else {
-            // If no target_y, use entity's Y
-            return new Vec3d(
-                    entity.getX() * scale,
-                    entity.getY(),
-                    entity.getZ() * scale
-            );
-        }
-    }
-
-    @Override
-    protected Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
-        return defaultSearchStartPosition(data, entity, targetWorld);
-    }
-
-    @Override
-    protected SerializableData getData() {
-        return DATA;
+        // If target_y is specified, use it
+        // If no target_y, use entity's Y
+        return new Vec3d(
+                entity.getX() * scale,
+                Objects.requireNonNullElseGet(targetY, entity::getY),
+                entity.getZ() * scale
+        );
     }
 
     public static ActionFactory<Entity> getFactory() {

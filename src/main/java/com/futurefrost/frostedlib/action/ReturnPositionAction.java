@@ -1,10 +1,7 @@
 package com.futurefrost.frostedlib.action;
 
 import com.futurefrost.frostedlib.FrostedLib;
-import com.futurefrost.frostedlib.data.EntityDataComponent;
-import com.futurefrost.frostedlib.data.PlayerDataComponent;
 import com.futurefrost.frostedlib.data.PositionData;
-import com.futurefrost.frostedlib.registry.ModComponents;
 import com.futurefrost.frostedlib.util.TeleportHelper;
 import io.github.apace100.apoli.data.ApoliDataTypes;
 import io.github.apace100.apoli.power.factory.action.ActionFactory;
@@ -28,6 +25,8 @@ import net.minecraft.world.World;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.futurefrost.frostedlib.util.NbtHelper.getSavedPosition;
+
 public class ReturnPositionAction {
 
     public static void action(SerializableData.Instance data, Entity entity) {
@@ -35,15 +34,7 @@ public class ReturnPositionAction {
         boolean showMessage = data.getBoolean("show_message");
 
         // Get position data from appropriate component
-        Optional<PositionData> optionalPos = Optional.empty();
-
-        if (entity instanceof ServerPlayerEntity player) {
-            PlayerDataComponent playerData = ModComponents.PLAYER_DATA.get(player);
-            optionalPos = playerData.getPosition(positionId);
-        } else {
-            EntityDataComponent entityData = ModComponents.ENTITY_DATA.get(entity);
-            optionalPos = entityData.getPosition(positionId);
-        }
+        Optional<PositionData> optionalPos = getSavedPosition(entity, positionId);
 
         if (optionalPos.isPresent()) {
             // Teleport to saved position
@@ -54,7 +45,7 @@ public class ReturnPositionAction {
 
             ServerWorld targetWorld = server.getWorld(pos.dimension());
             if (targetWorld == null) {
-                FrostedLib.LOGGER.error("Target world not found: " + pos.dimension());
+                FrostedLib.LOGGER.error("Target world not found: {}", pos.dimension());
                 executeFailsafe(data, entity);
                 return;
             }
@@ -89,7 +80,6 @@ public class ReturnPositionAction {
                         pos.yaw(),
                         pos.pitch()
                 );
-                success = true;
 
                 if (showMessage) {
                     FrostedLib.LOGGER.info("Entity {} teleported to position '{}'",

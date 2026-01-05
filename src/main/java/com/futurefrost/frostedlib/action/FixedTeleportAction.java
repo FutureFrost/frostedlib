@@ -49,17 +49,6 @@ public class FixedTeleportAction extends BaseTeleportAction {
         return new Vec3d(targetX, targetY, targetZ);
     }
 
-    @Override
-    protected Vec3d calculateSearchStartPosition(SerializableData.Instance data, Entity entity, ServerWorld targetWorld) {
-        // For fixed teleport, the search start is the exact target position
-        return calculateTargetPosition(data, entity, targetWorld);
-    }
-
-    @Override
-    protected SerializableData getData() {
-        return DATA;
-    }
-
     public static ActionFactory<Entity> getFactory() {
         return new ActionFactory<>(
                 Identifier.of("frostedlib", "fixed_teleport"),
