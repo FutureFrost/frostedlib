@@ -2,7 +2,7 @@
 	"schemaVersion": 1,
 	"id": "frostedlib",
 	"version": "${version}",
-	"name": "frostedlib",
+	"name": "FrostedLib",
 	"description": "A library for Origins teleportation and position management.",
 	"authors": [
 		"Future Frost"
@@ -44,12 +44,6 @@
 		"cardinal-components": [
 			"frostedlib:player_data",
 			"frostedlib:entity_data"
-		],
-		"origins:power_types": [
-			"frostedlib:save_pos",
-			"frostedlib:return_pos",
-			"frostedlib:fake_respawn",
-			"frostedlib:dimension_shift"
 		]
 	}
 }
