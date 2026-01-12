@@ -111,8 +111,7 @@ public class PlatformGenerator {
         }
     }
 
-    public void generatePlatform(ServerWorld world, int centerX, int centerY, int centerZ,
-                                 int size, String shape, BlockState block) {
+    public void generatePlatform(ServerWorld world, int centerX, int centerY, int centerZ, int size, String shape, BlockState block) {
         switch (shape) {
             case SHAPE_SQUARE:
                 generateSquarePlatform(world, centerX, centerY, centerZ, size, block);
@@ -133,8 +132,7 @@ public class PlatformGenerator {
         }
     }
 
-    private void generateCircularPlatform(ServerWorld world, int centerX, int centerY, int centerZ,
-                                          int radius, BlockState block) {
+    private void generateCircularPlatform(ServerWorld world, int centerX, int centerY, int centerZ, int radius, BlockState block) {
         int radiusSq = radius * radius;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
@@ -145,8 +143,7 @@ public class PlatformGenerator {
         }
     }
 
-    private void generateSquarePlatform(ServerWorld world, int centerX, int centerY, int centerZ,
-                                        int radius, BlockState block) {
+    private void generateSquarePlatform(ServerWorld world, int centerX, int centerY, int centerZ, int radius, BlockState block) {
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 world.setBlockState(new BlockPos(centerX + dx, centerY, centerZ + dz), block);
@@ -154,8 +151,7 @@ public class PlatformGenerator {
         }
     }
 
-    private void generateCrossPlatform(ServerWorld world, int centerX, int centerY, int centerZ,
-                                       int radius, BlockState block) {
+    private void generateCrossPlatform(ServerWorld world, int centerX, int centerY, int centerZ, int radius, BlockState block) {
         // Horizontal line
         for (int dx = -radius; dx <= radius; dx++) {
             world.setBlockState(new BlockPos(centerX + dx, centerY, centerZ), block);
@@ -166,14 +162,17 @@ public class PlatformGenerator {
         }
     }
 
-    private void generateSafeRoom(ServerWorld world, int centerX, int centerY, int centerZ,
-                                  int size, BlockState block) {
+    private void generateSafeRoom(ServerWorld world, int centerX, int centerY, int centerZ, int size, BlockState block) {
+        int height = size * 2;
+
         // Floor
         generateSquarePlatform(world, centerX, centerY, centerZ, size, block);
+
         // Ceiling
-        generateSquarePlatform(world, centerX, centerY + 3, centerZ, size, block);
+        generateSquarePlatform(world, centerX, centerY + height, centerZ, size, block);
+
         // Walls
-        for (int y = centerY + 1; y <= centerY + 2; y++) {
+        for (int y = centerY + 1; y < centerY + height; y++) {
             for (int d = -size; d <= size; d++) {
                 world.setBlockState(new BlockPos(centerX + size, y, centerZ + d), block);
                 world.setBlockState(new BlockPos(centerX - size, y, centerZ + d), block);
