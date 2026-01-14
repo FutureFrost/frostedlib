@@ -114,6 +114,15 @@ public class PlatformGenerator {
                 world.setBlockState(new BlockPos(centerX + d, y, centerZ - size), block);
             }
         }
+
+        // Interior - Replace any blocks that may be on the inside with air.
+        for (int y = centerY + 1; y < centerY + height; y++) {
+            for (int dx = -size + 1; dx <= size - 1; dx++) {
+                for (int dz = -size + 1; dz <= size - 1; dz++) {
+                    world.setBlockState(new BlockPos(centerX + dx, y, centerZ + dz), Blocks.AIR.getDefaultState());
+                }
+            }
+        }
     }
 
     private Vec3d calculatePlatformPosition(int centerX, int centerY, int centerZ) {

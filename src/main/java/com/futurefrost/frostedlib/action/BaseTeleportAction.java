@@ -32,7 +32,7 @@ public abstract class BaseTeleportAction {
                 .add("on_error", ApoliDataTypes.ENTITY_ACTION, null)
                 .add("platform_block", SerializableDataTypes.IDENTIFIER, Identifier.of("minecraft", "obsidian"))
                 .add("platform_shape", SerializableDataTypes.STRING, "square")
-                .add("platform_size", SerializableDataTypes.INT, 3)
+                .add("platform_size", SerializableDataTypes.INT, 2)
                 .add("random_offset", SerializableDataTypes.DOUBLE, 0.0)
                 .add("search_radius", SerializableDataTypes.INT, 32)
                 .add("show_message", SerializableDataTypes.BOOLEAN, false)
