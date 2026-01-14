@@ -59,9 +59,11 @@ public class PositionFinder {
         boolean overLiquid = isOverLiquidSurface(world, centerX, centerZ);
         if (generatePlatform || overLiquid) {
             PlatformGenerator generator = new PlatformGenerator();
+            // Get the platform Y
+            int platformY = getPlatformYPosition(data, world, centerX, centerZ,
+                    heightMode, preferredY, strictHeight, overLiquid);
             Vec3d platform = generator.generatePlatformAtPosition(
-                    data, world, centerX, centerZ,
-                    heightMode, preferredY, strictHeight, overLiquid
+                    data, world, centerX, centerZ, platformY
             );
             if (platform != null) return platform;
         }
@@ -130,6 +132,29 @@ public class PositionFinder {
     /* ------------------------------------------------------------ */
     /*  Extracted helpers                                           */
     /* ------------------------------------------------------------ */
+
+    private int getPlatformYPosition(SerializableData.Instance data, ServerWorld world,
+                                     int x, int z, String heightMode, double preferredY,
+                                     boolean strictHeight, boolean overLiquid) {
+        // First, try to get a safe
+        Vec3d safePos = findSafeHeightPosition(data, world, x, z, heightMode, preferredY, strictHeight);
+
+        if (safePos != null) {
+            return (int) safePos.y - 1; // Platform goes below feet
+        }
+
+        // If no safe position found, use fallback logic
+        if (overLiquid) {
+            int liquidSurface = findTrueLiquidSurface(world, x, z);
+            if (liquidSurface != -1) {
+                return liquidSurface - 1;
+            }
+        }
+
+        // Try to get surface position
+        Vec3d surface = getSurfacePosition(world, x, z);
+        return Math.max((int) surface.y - 1, world.getBottomY());
+    }
 
     private double resolvePreferredY(SerializableData.Instance data, Entity entity, String mode) {
         if (HEIGHT_FIXED.equals(mode)) {
