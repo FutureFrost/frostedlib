@@ -56,10 +56,9 @@ public class PositionFinder {
         if (expanding != null) return expanding;
 
         // STAGE 3 – platform
-
         if (generatePlatform) {
             boolean overVoid = isOverVoid(world, centerX, centerZ);
-            boolean overLiquid = isOverLiquidSurface(world, centerX, centerZ);
+            boolean overLiquid = isBlockBelowLiquid(data, world, centerX, centerZ, heightMode, preferredY, strictHeight);
 
             if (overVoid || overLiquid) {
                 PlatformGenerator generator = new PlatformGenerator();
@@ -152,7 +151,9 @@ public class PositionFinder {
             }
         }
 
-        return -1;
+        // You should never get this far, if you do, something has gone very wrong.
+        FrostedLib.LOGGER.error("Failed to get proper platform Y position.");
+        return world.getSeaLevel();
     }
 
     private double resolvePreferredY(SerializableData.Instance data, Entity entity, String mode) {
@@ -427,7 +428,7 @@ public class PositionFinder {
     }
 
     public boolean isOverLiquidSurface(ServerWorld world, int x, int z) {
-        BlockPos topPos = world.getTopPosition(Heightmap.Type.WORLD_SURFACE, new BlockPos(x, 0, z));
+        BlockPos topPos = world.getTopPosition(Heightmap.Type.OCEAN_FLOOR, new BlockPos(x, 0, z));
         BlockState state = world.getBlockState(topPos);
         return !state.getFluidState().isEmpty();
     }
@@ -443,6 +444,7 @@ public class PositionFinder {
                 return y + 1;
             }
         }
+        // Potential issue here if the surface of the liquid is at y = -1
         return -1;
     }
 
@@ -456,5 +458,33 @@ public class PositionFinder {
             }
         }
         return true; // No solid blocks found
+    }
+
+    public boolean isBlockBelowLiquid(SerializableData.Instance data,
+                                      ServerWorld world,
+                                      int x, int z,
+                                      String heightMode,
+                                      double preferredY,
+                                      boolean strictHeight) {
+
+        // Get the position that would be used by findSafeHeightPosition
+        Vec3d foundPosition = findSafeHeightPosition(data, world, x, z, heightMode, preferredY, strictHeight);
+
+        // If no position was found, return false
+        if (foundPosition == null) {
+            return false;
+        }
+
+        // Extract the Y coordinate
+        int targetY = (int) foundPosition.y;
+
+        // Ensure targetY is valid (not at world bottom)
+        if (targetY <= world.getBottomY()) {
+            return false;
+        }
+
+        // Check if the block below the found position is liquid
+        BlockPos blockBelowPos = new BlockPos(x, targetY - 1, z);
+        return !world.getFluidState(blockBelowPos).isEmpty();
     }
 }
