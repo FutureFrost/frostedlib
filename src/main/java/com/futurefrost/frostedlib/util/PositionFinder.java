@@ -56,16 +56,19 @@ public class PositionFinder {
         if (expanding != null) return expanding;
 
         // STAGE 3 – platform
-        boolean overLiquid = isOverLiquidSurface(world, centerX, centerZ);
-        if (generatePlatform || overLiquid) {
-            PlatformGenerator generator = new PlatformGenerator();
-            // Get the platform Y
-            int platformY = getPlatformYPosition(data, world, centerX, centerZ,
-                    heightMode, preferredY, strictHeight, overLiquid);
-            Vec3d platform = generator.generatePlatformAtPosition(
-                    data, world, centerX, centerZ, platformY
-            );
-            if (platform != null) return platform;
+
+        if (generatePlatform) {
+            boolean overVoid = isOverVoid(world, centerX, centerZ);
+            boolean overLiquid = isOverLiquidSurface(world, centerX, centerZ);
+
+            if (overVoid || overLiquid) {
+                PlatformGenerator generator = new PlatformGenerator();
+                // Get the platform Y
+                int platformY = getPlatformYPosition(world, centerX, centerZ, overVoid, overLiquid);
+                // Ensure platform Y is valid
+                platformY = Math.max(platformY, world.getBottomY() + 1);
+                return generator.generatePlatformAtPosition(data, world, centerX, centerZ, platformY);
+            }
         }
 
         // STAGE 4 / 5 – fallbacks
@@ -133,27 +136,23 @@ public class PositionFinder {
     /*  Extracted helpers                                           */
     /* ------------------------------------------------------------ */
 
-    private int getPlatformYPosition(SerializableData.Instance data, ServerWorld world,
-                                     int x, int z, String heightMode, double preferredY,
-                                     boolean strictHeight, boolean overLiquid) {
-        // First, try to get a safe
-        Vec3d safePos = findSafeHeightPosition(data, world, x, z, heightMode, preferredY, strictHeight);
+    private int getPlatformYPosition(ServerWorld world,
+                                     int x, int z, boolean overVoid, boolean overLiquid) {
 
-        if (safePos != null) {
-            return (int) safePos.y - 1; // Platform goes below feet
+        if (overVoid) {
+            // For void, create platform at a reasonable height
+            return Math.max(world.getBottomY() + 10, world.getSeaLevel());
         }
 
-        // If no safe position found, use fallback logic
         if (overLiquid) {
+            // For liquid, create platform at liquid surface
             int liquidSurface = findTrueLiquidSurface(world, x, z);
             if (liquidSurface != -1) {
                 return liquidSurface - 1;
             }
         }
 
-        // Try to get surface position
-        Vec3d surface = getSurfacePosition(world, x, z);
-        return Math.max((int) surface.y - 1, world.getBottomY());
+        return -1;
     }
 
     private double resolvePreferredY(SerializableData.Instance data, Entity entity, String mode) {
@@ -381,6 +380,8 @@ public class PositionFinder {
         BlockPos head = new BlockPos(x, y + 1, z);
         BlockPos ground = new BlockPos(x, y - 1, z);
 
+        if (isOverVoid(world, x, z)) return false;
+
         if (isBlockUnsafeLiquid(data, world, feet) ||
                 isBlockUnsafeLiquid(data, world, head) ||
                 isBlockUnsafeLiquid(data, world, ground)) return false;
@@ -391,7 +392,7 @@ public class PositionFinder {
 
         return (feetState.isAir() || !feetState.isOpaque()) &&
                 (headState.isAir() || !headState.isOpaque()) &&
-                (groundState.isSolidBlock(world, ground) || y <= world.getBottomY() + 1);
+                (groundState.isSolidBlock(world, ground));
     }
 
     public boolean isPositionActuallySafe(SerializableData.Instance data, ServerWorld world, Vec3d pos) {
@@ -443,5 +444,17 @@ public class PositionFinder {
             }
         }
         return -1;
+    }
+
+    private boolean isOverVoid(ServerWorld world, int x, int z) {
+        // Check if there's any solid block from bottom to top
+        for (int y = world.getBottomY(); y < world.getTopY(); y++) {
+            BlockPos pos = new BlockPos(x, y, z);
+            BlockState state = world.getBlockState(pos);
+            if (state.isSolidBlock(world, pos)) {
+                return false; // Found solid ground, not void
+            }
+        }
+        return true; // No solid blocks found
     }
 }
