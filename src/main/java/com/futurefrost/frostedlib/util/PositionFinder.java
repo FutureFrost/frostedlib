@@ -461,8 +461,7 @@ public class PositionFinder {
                 world.getTopY() - 1);
 
         // Use the PlatformGenerator to create the platform
-        FrostedLib.LOGGER.info("Generating emergency platform at [{}, {}, {}]",
-                x, platformY, z);
+        FrostedLib.LOGGER.info("Generated platform at [{}, {}, {}] in dimension {}", x, platformY, z, world.getRegistryKey().getValue());
 
         return platformGenerator.generatePlatformAtPosition(data, world, x, z, platformY);
     }
