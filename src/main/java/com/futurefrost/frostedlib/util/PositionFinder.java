@@ -304,12 +304,12 @@ public class PositionFinder {
         BlockState groundState = world.getBlockState(groundPos);
 
         // Feet must be passable or replaceable
-        if (!isBlockPassableOrReplaceable(feetState, world, feetPos)) {
+        if (isBlockNotPassableOrReplaceable(feetState, world, feetPos)) {
             return false;
         }
 
         // Head must be passable or replaceable
-        if (!isBlockPassableOrReplaceable(headState, world, headPos)) {
+        if (isBlockNotPassableOrReplaceable(headState, world, headPos)) {
             return false;
         }
 
@@ -332,24 +332,24 @@ public class PositionFinder {
         return state.isSolidBlock(world, pos);
     }
 
-    private boolean isBlockPassableOrReplaceable(BlockState state, ServerWorld world, BlockPos pos) {
+    private boolean isBlockNotPassableOrReplaceable(BlockState state, ServerWorld world, BlockPos pos) {
         // Check if block is air
         if (state.isAir()) {
-            return true;
+            return false;
         }
 
         // Check if block is replaceable (like tall grass, flowers, etc.)
         if (state.isReplaceable()) {
-            return true;
+            return false;
         }
 
         // Check if block is not a full cube (like fences, slabs, etc.)
         if (!state.isOpaqueFullCube(world, pos)) {
-            return true;
+            return false;
         }
 
         // For non-solid blocks like glass panes, fences, etc.
-        return !state.isSolidBlock(world, pos);
+        return state.isSolidBlock(world, pos);
     }
 
     private boolean isUnsafeLiquid(ServerWorld world, BlockPos pos) {
@@ -383,23 +383,23 @@ public class PositionFinder {
         return null;
     }
 
-    private int findLiquidSurface(ServerWorld world, int x, int z) {
+    private Integer findLiquidSurface(ServerWorld world, int x, int z) {
         BlockPos.Mutable mutable = new BlockPos.Mutable(x, world.getTopY(), z);
 
-        for (int y = world.getTopY(); y > world.getBottomY(); y--) {
+        for (int y = world.getTopY(); y >= world.getBottomY(); y--) {
             mutable.setY(y);
             if (!world.getFluidState(mutable).isEmpty() &&
                     world.getBlockState(mutable.up()).isAir()) {
-                return y + 1;
+                return y + 1;  // Position above liquid surface
             }
         }
 
-        return -1;
+        return null;  // No liquid surface found
     }
 
     private boolean isOverLiquidColumn(ServerWorld world, int x, int z) {
-        int liquidSurface = findLiquidSurface(world, x, z);
-        return liquidSurface != -1;
+        Integer liquidSurface = findLiquidSurface(world, x, z);
+        return liquidSurface != null;
     }
 
     private boolean isSkyAbove(ServerWorld world, BlockPos pos) {
@@ -444,8 +444,8 @@ public class PositionFinder {
                     world.getSeaLevel());
         } else {
             // Platform above liquid
-            int liquidSurface = findLiquidSurface(world, x, z);
-            platformY = liquidSurface != -1 ? liquidSurface - 1 : world.getSeaLevel();
+            Integer liquidSurface = findLiquidSurface(world, x, z);
+            platformY = liquidSurface != null ? liquidSurface - 1 : world.getSeaLevel();
         }
 
         // Ensure platform is within world bounds
