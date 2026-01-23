@@ -196,7 +196,9 @@ public class PositionFinder {
         // Search downward for first unexposed position
         for (int y = searchStartY; y >= bottomY; y--) {
             BlockPos pos = new BlockPos(x, y, z);
-            if (!world.isSkyVisible(pos)) {
+
+            // Check if position is not exposed to the sky
+            if (!isSkyAbove(world, pos)) {
                 if (isPositionValid(data, world, x, y, z)) {
                     return toCenterVec3d(x, y, z);
                 }
@@ -218,7 +220,9 @@ public class PositionFinder {
         Vec3d surfacePos = getSurfacePosition(world, x, z, data.getBoolean("liquids_safe"));
         if (surfacePos != null) {
             BlockPos pos = new BlockPos((int)surfacePos.x, (int)surfacePos.y, (int)surfacePos.z);
-            if (world.isSkyVisible(pos) && isPositionValid(data, world, x, (int)surfacePos.y, z)) {
+
+            // Check if position is exposed to the sky
+            if (isSkyAbove(world, pos) && isPositionValid(data, world, x, (int)surfacePos.y, z)) {
                 return surfacePos;
             }
         }
@@ -228,7 +232,9 @@ public class PositionFinder {
             int surfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z);
             for (int y = surfaceY; y <= world.getTopY(); y++) {
                 BlockPos pos = new BlockPos(x, y, z);
-                if (world.isSkyVisible(pos) && isPositionValid(data, world, x, y, z)) {
+
+                // Check if position is exposed to the sky
+                if (isSkyAbove(world, pos) && isPositionValid(data, world, x, y, z)) {
                     return toCenterVec3d(x, y, z);
                 }
             }
@@ -435,6 +441,34 @@ public class PositionFinder {
     private boolean isOverLiquidColumn(ServerWorld world, int x, int z) {
         int liquidSurface = findLiquidSurface(world, x, z);
         return liquidSurface != -1;
+    }
+
+    private boolean isSkyAbove(ServerWorld world, BlockPos pos) {
+        int worldTopY = world.getTopY();
+        BlockPos.Mutable mutable = new BlockPos.Mutable(pos.getX(), pos.getY(), pos.getZ());
+
+        for (int y = pos.getY() + 1; y <= worldTopY; y++) {
+            mutable.setY(y);
+            BlockState state = world.getBlockState(mutable);
+
+            // Skip air and obviously non-blocking blocks
+            if (state.isAir() || state.isReplaceable()) {
+                continue;
+            }
+
+            // Skip translucent blocks (glass, leaves, etc.)
+            if (!state.isOpaque()) {
+                continue;
+            }
+
+            // If it's solid or opaque, it blocks the sky
+            if (state.isSolidBlock(world, mutable) ||
+                    state.isOpaqueFullCube(world, mutable)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /* ------------------------------------------------------------ */
