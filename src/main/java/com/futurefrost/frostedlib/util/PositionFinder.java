@@ -238,10 +238,9 @@ public class PositionFinder {
                     return toCenterVec3d(x, y, z);
                 }
             }
-            return null;
         }
 
-        return surfacePos;
+        return null;
     }
 
     private Vec3d searchVertically(SerializableData.Instance data, ServerWorld world,
@@ -522,8 +521,8 @@ public class PositionFinder {
             // Try unexposed as fallback
             return findUnexposedPosition(data, world, x, z, (int)preferredY, false);
         } else {
-            // Fall back to surface
-            return getSurfacePosition(world, x, z, data.getBoolean("liquids_safe"));
+            // Try exposed as fallback
+            return findExposedPosition(data, world, x, z, false);
         }
     }
 
