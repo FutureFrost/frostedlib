@@ -178,7 +178,7 @@ public class PositionFinder {
         }
 
         // Attempt to fall back to surface
-        found = getSurfacePosition(world, x, z, data.getBoolean("liquids_safe"));
+        found = getSurfacePosition(world, x, z);
         if (found != null && isPositionValid(data, world, (int)found.x, (int)found.y, (int)found.z)) {
             return found;
         }
@@ -217,7 +217,7 @@ public class PositionFinder {
                                       int x, int z, boolean strictHeight) {
 
         // Get surface position with proper liquid safety
-        Vec3d surfacePos = getSurfacePosition(world, x, z, data.getBoolean("liquids_safe"));
+        Vec3d surfacePos = getSurfacePosition(world, x, z);
         if (surfacePos != null) {
             BlockPos pos = new BlockPos((int)surfacePos.x, (int)surfacePos.y, (int)surfacePos.z);
 
@@ -362,20 +362,9 @@ public class PositionFinder {
     /*  Surface and liquid handling                                 */
     /* ------------------------------------------------------------ */
 
-    private Vec3d getSurfacePosition(ServerWorld world, int x, int z, boolean liquidsSafe) {
+    private Vec3d getSurfacePosition(ServerWorld world, int x, int z) {
         // Get world surface height
         int surfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z);
-
-        // First check for liquid surface if liquids are safe
-        if (liquidsSafe) {
-            int liquidSurface = findLiquidSurface(world, x, z);
-            if (liquidSurface != -1) {
-                // Verify it's actually a safe liquid position
-                if (isLiquidPositionSafe(world, x, liquidSurface, z)) {
-                    return toCenterVec3d(x, liquidSurface, z);
-                }
-            }
-        }
 
         // Find the first air block above solid ground
         for (int y = surfaceY; y >= world.getBottomY(); y--) {
@@ -391,36 +380,7 @@ public class PositionFinder {
             }
         }
 
-        // Fallback to sea level if nothing else found
-        int seaLevel = world.getSeaLevel();
-        BlockPos seaPos = new BlockPos(x, seaLevel, z);
-        BlockPos belowSeaPos = new BlockPos(x, seaLevel - 1, z);
-
-        if (world.getBlockState(seaPos).isAir() &&
-                world.getBlockState(belowSeaPos).isSolidBlock(world, belowSeaPos)) {
-            return toCenterVec3d(x, seaLevel, z);
-        }
-
         return null;
-    }
-
-    private boolean isLiquidPositionSafe(ServerWorld world, int x, int y, int z) {
-        // Check if the position is on liquid surface
-        BlockPos liquidPos = new BlockPos(x, y - 1, z);
-        BlockPos feetPos = new BlockPos(x, y, z);
-
-        // There should be liquid below
-        if (world.getFluidState(liquidPos).isEmpty()) {
-            return false;
-        }
-
-        // And air at feet level
-        if (!world.getBlockState(feetPos).isAir()) {
-            return false;
-        }
-
-        // And air at head level
-        return world.getBlockState(feetPos.up()).isAir();
     }
 
     private int findLiquidSurface(ServerWorld world, int x, int z) {
