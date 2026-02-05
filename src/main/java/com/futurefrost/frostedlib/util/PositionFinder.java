@@ -28,12 +28,13 @@ public class PositionFinder {
     private final PlatformGenerator platformGenerator = new PlatformGenerator();
 
     /* ------------------------------------------------------------ */
-    /*  Main entry point                                            */
+    /*  Main Entry Point                                            */
     /* ------------------------------------------------------------ */
 
     public Vec3d findSafePosition(SerializableData.Instance data, Entity entity,
                                   ServerWorld world, int centerX, int centerZ) {
 
+        // Get configuration with defaults
         String heightMode = data.getString("target_height");
         if (heightMode == null || heightMode.isEmpty()) {
             heightMode = HEIGHT_EXPOSED;
@@ -84,7 +85,7 @@ public class PositionFinder {
     }
 
     /* ------------------------------------------------------------ */
-    /*  Core search algorithms                                      */
+    /*  Core Search Algorithms                                      */
     /* ------------------------------------------------------------ */
 
     private Vec3d searchExpandingSquare(SerializableData.Instance data, ServerWorld world,
@@ -141,6 +142,7 @@ public class PositionFinder {
     private Vec3d findPositionAtFixedY(SerializableData.Instance data, ServerWorld world,
                                        int x, int z, int targetY, boolean strictHeight, Entity entity) {
 
+        // Check if position is valid at exactly targetY
         if (isPositionValid(data, world, x, targetY, z, entity)) {
             return toCenterVec3d(x, targetY, z);
         }
@@ -149,12 +151,14 @@ public class PositionFinder {
             return null;
         }
 
+        // Search vertically around targetY
         return searchVertically(data, world, x, z, targetY, entity);
     }
 
     private Vec3d findPositionAroundY(SerializableData.Instance data, ServerWorld world,
                                       int x, int z, int referenceY, boolean strictHeight, Entity entity) {
 
+        // Start from referenceY and search both directions
         Vec3d found = searchVertically(data, world, x, z, referenceY, entity);
         if (found != null) {
             return found;
@@ -370,25 +374,26 @@ public class PositionFinder {
         ConditionFactory<FluidState>.Instance liquidCondition = data.get("liquid_condition");
         boolean liquidsSafe = data.getBoolean("liquids_safe");
 
-        // No condition configured
+        // CASE 1: No liquid condition configured
+        // if liquids_safe is false, any liquid is unsafe
+        // If liquids_safe is true, all liquids are safe
         if (liquidCondition == null) {
-            return !liquidsSafe; // If liquids_safe is false, any fluid is unsafe
+            return !liquidsSafe;
         }
 
-        // Condition configured
+        // CASE 2: Liquid condition IS configured
+        // if liquids_safe is false, only condition-specified liquids are unsafe
+        // If liquids_safe is true, only condition-specified liquids are safe
         try {
             boolean conditionMatches = liquidCondition.test(fluidState);
-
             if (liquidsSafe) {
-                // Only condition-specified liquids are safe
                 return !conditionMatches;
             } else {
-                // Only condition-specified liquids are unsafe
                 return conditionMatches;
             }
         } catch (Exception e) {
             FrostedLib.LOGGER.warn("Failed to evaluate liquid condition at {}: {}", pos, e.getMessage());
-            return !liquidsSafe; // Fallback
+            return !liquidsSafe; // Fallback to CASE 1 behavior
         }
     }
 
@@ -451,6 +456,7 @@ public class PositionFinder {
                 Math.max(world.getBottomY() + PLATFORM_HEIGHT_ABOVE_VOID, world.getSeaLevel()) :
                 findLiquidSurface(data, world, x, z);
 
+        // Ensure platform is within world bounds
         platformY = MathHelper.clamp(platformY,
                 world.getBottomY() + 1,
                 world.getTopY() - 1);
@@ -462,6 +468,7 @@ public class PositionFinder {
         FrostedLib.LOGGER.info("Generated platform at [{}, {}, {}] in dimension {}",
                 x, platformY, z, world.getRegistryKey().getValue());
 
+        // Use the platformGenerator to create the platform
         return platformGenerator.generatePlatformAtPosition(data, world, x, z, platformY);
     }
 
@@ -535,8 +542,10 @@ public class PositionFinder {
                                       double preferredY, Entity entity) {
 
         if (originalMode.equals(HEIGHT_EXPOSED) || originalMode.equals(HEIGHT_FIXED)) {
+            // Try unexposed as fallback
             return findUnexposedPosition(data, world, x, z, (int) preferredY, false, entity);
         } else {
+            // Try exposed as fallback
             return findExposedPosition(data, world, x, z, false, entity);
         }
     }
