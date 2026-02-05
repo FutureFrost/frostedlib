@@ -314,47 +314,6 @@ public class PositionFinder {
         return isSolidGround(groundState, world, groundPos);
     }
 
-    private boolean isLiquidUnsafe(SerializableData.Instance data,
-                                   ServerWorld world, BlockPos pos) {
-
-        FluidState fluidState = world.getFluidState(pos);
-
-        // Check if there's any fluid at this position
-        boolean hasFluid = !fluidState.isEmpty();
-
-        // Get the liquid condition if configured
-        ConditionFactory<FluidState>.Instance liquidCondition = data.get("liquid_condition");
-        boolean liquidsSafe = data.getBoolean("liquids_safe");
-
-        // CASE 1: No liquid condition configured
-        // if liquids_safe is false, any liquid is unsafe
-        // If liquids_safe is true, all liquids are safe
-        if (liquidCondition == null) {
-            return !liquidsSafe && hasFluid;
-        }
-
-        // CASE 2: Liquid condition IS configured
-        // if liquids_safe is false, only condition-specified liquids are unsafe
-        // If liquids_safe is true, only condition-specified liquids are safe
-        boolean conditionMatches;
-        try {
-            // Test against FluidState (not BlockState)
-            conditionMatches = liquidCondition.test(fluidState);
-
-            if (liquidsSafe) {
-                return hasFluid && !conditionMatches;
-            } else {
-                return hasFluid && conditionMatches;
-            }
-        } catch (Exception e) {
-            // If condition evaluation fails, log with full stack trace
-            FrostedLib.LOGGER.warn("Failed to evaluate liquid condition at position {}: {}",
-                    pos, e.getMessage(), e);
-            // Fallback to CASE 1 behavior
-            return !liquidsSafe && hasFluid;
-        }
-    }
-
     private boolean isColumnEmpty(ServerWorld world, int x, int z) {
         for (int y = world.getBottomY(); y < world.getTopY(); y++) {
             BlockPos pos = new BlockPos(x, y, z);
@@ -415,6 +374,46 @@ public class PositionFinder {
         return null;
     }
 
+    private boolean isLiquidUnsafe(SerializableData.Instance data,
+                                   ServerWorld world, BlockPos pos) {
+
+        FluidState fluidState = world.getFluidState(pos);
+
+        // Check if there's any fluid at this position
+        boolean hasFluid = !fluidState.isEmpty();
+
+        // Get the liquid condition if configured
+        ConditionFactory<FluidState>.Instance liquidCondition = data.get("liquid_condition");
+        boolean liquidsSafe = data.getBoolean("liquids_safe");
+
+        // CASE 1: No liquid condition configured
+        // if liquids_safe is false, any liquid is unsafe
+        // If liquids_safe is true, all liquids are safe
+        if (liquidCondition == null) {
+            return !liquidsSafe && hasFluid;
+        }
+
+        // CASE 2: Liquid condition IS configured
+        // if liquids_safe is false, only condition-specified liquids are unsafe
+        // If liquids_safe is true, only condition-specified liquids are safe
+        boolean conditionMatches;
+        try {
+            // Test against FluidState (not BlockState)
+            conditionMatches = liquidCondition.test(fluidState);
+
+            if (liquidsSafe) {
+                return hasFluid && !conditionMatches;
+            } else {
+                return hasFluid && conditionMatches;
+            }
+        } catch (Exception e) {
+            // If condition evaluation fails, log with full stack trace
+            FrostedLib.LOGGER.warn("Failed to evaluate liquid condition at position {}: {}",
+                    pos, e.getMessage(), e);
+            // Fallback to CASE 1 behavior
+            return !liquidsSafe && hasFluid;
+        }
+    }
 
     private boolean isOverLiquidColumn(SerializableData.Instance data,
                                        ServerWorld world, int x, int z) {
