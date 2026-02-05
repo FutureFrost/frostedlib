@@ -39,7 +39,7 @@ public abstract class BaseTeleportAction {
                 .add("target_height", SerializableDataTypes.STRING, null)
                 .add("strict_height", SerializableDataTypes.BOOLEAN, false)
                 .add("liquids_safe", SerializableDataTypes.BOOLEAN, false)
-                .add("liquid_condition", ApoliDataTypes.BLOCK_CONDITION, null)
+                .add("liquid_condition", ApoliDataTypes.FLUID_CONDITION, null)
                 .add("error_message", SerializableDataTypes.STRING, null);
     }
 

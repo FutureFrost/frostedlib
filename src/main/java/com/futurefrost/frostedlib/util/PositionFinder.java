@@ -1,11 +1,11 @@
 package com.futurefrost.frostedlib.util;
 
 import com.futurefrost.frostedlib.FrostedLib;
+import io.github.apace100.apoli.power.factory.condition.ConditionFactory;
 import io.github.apace100.calio.data.SerializableData;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.fluid.Fluids;
+import net.minecraft.fluid.FluidState;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -47,7 +47,6 @@ public class PositionFinder {
         boolean generatePlatform = data.getBoolean("generate_platform");
         int searchRadius = Math.min(data.getInt("search_radius"), MAX_SEARCH_RADIUS);
         int maxAttempts = data.getInt("max_search_attempts");
-        boolean liquidsSafe = data.getBoolean("liquids_safe");
 
         WorldBorder worldBorder = world.getWorldBorder();
         BlockPos.Mutable mutablePos = new BlockPos.Mutable();
@@ -73,9 +72,10 @@ public class PositionFinder {
         // STAGE 3: Platform generation if configured
         if (generatePlatform) {
             boolean overVoid = isColumnEmpty(world, centerX, centerZ);
-            boolean overLiquid = isOverLiquidColumn(world, centerX, centerZ);
+            boolean overLiquid = isOverLiquidColumn(data, world, centerX, centerZ);
 
-            if (overVoid || (overLiquid && !liquidsSafe)) {
+            if (overVoid || overLiquid) {
+                FrostedLib.LOGGER.info("test");
                 return generateEmergencyPlatform(data, world, centerX, centerZ, overVoid);
             }
         }
@@ -250,7 +250,7 @@ public class PositionFinder {
         int bottomY = world.getBottomY();
 
         // Search in both directions from center
-        for (int offset = 0; offset <= PositionFinder.VERTICAL_SEARCH_RANGE; offset++) {
+        for (int offset = 0; offset <= VERTICAL_SEARCH_RANGE; offset++) {
             // Try above
             int yAbove = centerY + offset;
             if (yAbove <= topY && isPositionValid(data, world, x, yAbove, z)) {
@@ -289,14 +289,11 @@ public class PositionFinder {
             return false;
         }
 
-        // Check liquids
-        boolean liquidsSafe = data.getBoolean("liquids_safe");
-        if (!liquidsSafe) {
-            if (isUnsafeLiquid(world, feetPos) ||
-                    isUnsafeLiquid(world, headPos) ||
-                    isUnsafeLiquid(world, groundPos)) {
-                return false;
-            }
+        // Check for unsafe liquids
+        if (isLiquidUnsafe(data, world, feetPos) ||
+                isLiquidUnsafe(data, world, headPos) ||
+                isLiquidUnsafe(data, world, groundPos)) {
+            return false;
         }
 
         BlockState feetState = world.getBlockState(feetPos);
@@ -315,6 +312,47 @@ public class PositionFinder {
 
         // Ground must be solid
         return isSolidGround(groundState, world, groundPos);
+    }
+
+    private boolean isLiquidUnsafe(SerializableData.Instance data,
+                                   ServerWorld world, BlockPos pos) {
+
+        FluidState fluidState = world.getFluidState(pos);
+
+        // Check if there's any fluid at this position
+        boolean hasFluid = !fluidState.isEmpty();
+
+        // Get the liquid condition if configured
+        ConditionFactory<FluidState>.Instance liquidCondition = data.get("liquid_condition");
+        boolean liquidsSafe = data.getBoolean("liquids_safe");
+
+        // CASE 1: No liquid condition configured
+        // if liquids_safe is false, any liquid is unsafe
+        // If liquids_safe is true, all liquids are safe
+        if (liquidCondition == null) {
+            return !liquidsSafe && hasFluid;
+        }
+
+        // CASE 2: Liquid condition IS configured
+        // if liquids_safe is false, only condition-specified liquids are unsafe
+        // If liquids_safe is true, only condition-specified liquids are safe
+        boolean conditionMatches;
+        try {
+            // Test against FluidState (not BlockState)
+            conditionMatches = liquidCondition.test(fluidState);
+
+            if (liquidsSafe) {
+                return hasFluid && !conditionMatches;
+            } else {
+                return hasFluid && conditionMatches;
+            }
+        } catch (Exception e) {
+            // If condition evaluation fails, log with full stack trace
+            FrostedLib.LOGGER.warn("Failed to evaluate liquid condition at position {}: {}",
+                    pos, e.getMessage(), e);
+            // Fallback to CASE 1 behavior
+            return !liquidsSafe && hasFluid;
+        }
     }
 
     private boolean isColumnEmpty(ServerWorld world, int x, int z) {
@@ -352,12 +390,6 @@ public class PositionFinder {
         return state.isSolidBlock(world, pos);
     }
 
-    private boolean isUnsafeLiquid(ServerWorld world, BlockPos pos) {
-        Fluid fluid = world.getFluidState(pos).getFluid();
-        return fluid == Fluids.WATER || fluid == Fluids.FLOWING_WATER ||
-                fluid == Fluids.LAVA || fluid == Fluids.FLOWING_LAVA;
-    }
-
     /* ------------------------------------------------------------ */
     /*  Surface and liquid handling                                 */
     /* ------------------------------------------------------------ */
@@ -383,23 +415,22 @@ public class PositionFinder {
         return null;
     }
 
-    private Integer findLiquidSurface(ServerWorld world, int x, int z) {
+
+    private boolean isOverLiquidColumn(SerializableData.Instance data,
+                                       ServerWorld world, int x, int z) {
         BlockPos.Mutable mutable = new BlockPos.Mutable(x, world.getTopY(), z);
 
         for (int y = world.getTopY(); y >= world.getBottomY(); y--) {
             mutable.setY(y);
+
+            // Check if this position has fluid AND if it's unsafe
             if (!world.getFluidState(mutable).isEmpty() &&
-                    world.getBlockState(mutable.up()).isAir()) {
-                return y + 1;  // Position above liquid surface
+                    isLiquidUnsafe(data, world, mutable)) {
+                return true; // Found unsafe liquid
             }
         }
 
-        return null;  // No liquid surface found
-    }
-
-    private boolean isOverLiquidColumn(ServerWorld world, int x, int z) {
-        Integer liquidSurface = findLiquidSurface(world, x, z);
-        return liquidSurface != null;
+        return false; // No unsafe liquids found
     }
 
     private boolean isSkyAbove(ServerWorld world, BlockPos pos) {
@@ -434,8 +465,8 @@ public class PositionFinder {
     /*  Platform generation                                         */
     /* ------------------------------------------------------------ */
 
-    private Vec3d generateEmergencyPlatform(SerializableData.Instance data, ServerWorld world,
-                                            int x, int z, boolean overVoid) {
+    private Vec3d generateEmergencyPlatform(SerializableData.Instance data,
+                                            ServerWorld world, int x, int z, boolean overVoid) {
 
         int platformY;
         if (overVoid) {
@@ -443,9 +474,8 @@ public class PositionFinder {
             platformY = Math.max(world.getBottomY() + PLATFORM_HEIGHT_ABOVE_VOID,
                     world.getSeaLevel());
         } else {
-            // Platform above liquid
-            Integer liquidSurface = findLiquidSurface(world, x, z);
-            platformY = liquidSurface != null ? liquidSurface - 1 : world.getSeaLevel();
+            // Platform above liquid - find the highest unsafe liquid surface
+            platformY = findLiquidSurface(data, world, x, z);
         }
 
         // Ensure platform is within world bounds
@@ -454,9 +484,34 @@ public class PositionFinder {
                 world.getTopY() - 1);
 
         // Use the PlatformGenerator to create the platform
-        FrostedLib.LOGGER.info("Generated platform at [{}, {}, {}] in dimension {}", x, platformY, z, world.getRegistryKey().getValue());
+        FrostedLib.LOGGER.info("Generated platform at [{}, {}, {}] in dimension {}",
+                x, platformY, z, world.getRegistryKey().getValue());
 
         return platformGenerator.generatePlatformAtPosition(data, world, x, z, platformY);
+    }
+
+    private int findLiquidSurface(SerializableData.Instance data,
+                                  ServerWorld world, int x, int z) {
+        BlockPos.Mutable mutable = new BlockPos.Mutable(x, world.getTopY(), z);
+        int highestUnsafeY = Integer.MIN_VALUE;
+
+        for (int y = world.getTopY(); y >= world.getBottomY(); y--) {
+            mutable.setY(y);
+            FluidState fluidState = world.getFluidState(mutable);
+
+            // Check if this position has fluid AND if it's unsafe
+            if (!fluidState.isEmpty() && isLiquidUnsafe(data, world, mutable)) {
+
+                // Check if the block above is air (this is a liquid surface)
+                mutable.setY(y + 1);
+                if (world.getBlockState(mutable).isAir()) {
+                    highestUnsafeY = Math.max(highestUnsafeY, y);
+                }
+                mutable.setY(y); // Reset Y for next iteration
+            }
+        }
+
+        return highestUnsafeY;
     }
 
     /* ------------------------------------------------------------ */
