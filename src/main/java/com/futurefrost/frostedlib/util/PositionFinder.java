@@ -4,17 +4,16 @@ import com.futurefrost.frostedlib.FrostedLib;
 import io.github.apace100.apoli.power.factory.condition.ConditionFactory;
 import io.github.apace100.calio.data.SerializableData;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
 import net.minecraft.entity.Entity;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.*;
+import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.border.WorldBorder;
 
-import java.util.*;
+import java.util.Objects;
 
 public class PositionFinder {
     private static final String HEIGHT_EXPOSED = "exposed";
@@ -26,7 +25,6 @@ public class PositionFinder {
     private static final int VERTICAL_SEARCH_RANGE = 64;
     private static final int PLATFORM_HEIGHT_ABOVE_VOID = 10;
 
-    // Platform generator instance
     private final PlatformGenerator platformGenerator = new PlatformGenerator();
 
     /* ------------------------------------------------------------ */
@@ -36,7 +34,6 @@ public class PositionFinder {
     public Vec3d findSafePosition(SerializableData.Instance data, Entity entity,
                                   ServerWorld world, int centerX, int centerZ) {
 
-        // Get configuration with defaults
         String heightMode = data.getString("target_height");
         if (heightMode == null || heightMode.isEmpty()) {
             heightMode = HEIGHT_EXPOSED;
@@ -51,38 +48,36 @@ public class PositionFinder {
         WorldBorder worldBorder = world.getWorldBorder();
         BlockPos.Mutable mutablePos = new BlockPos.Mutable();
 
-        // STAGE 1: Try exact position first
-        mutablePos.set(centerX, (int)preferredY, centerZ);
+        // STAGE 1: Exact position
+        mutablePos.set(centerX, (int) preferredY, centerZ);
         if (worldBorder.contains(mutablePos)) {
             Vec3d exactPos = findPositionAtColumn(data, world, centerX, centerZ,
-                    heightMode, preferredY, strictHeight);
+                    heightMode, preferredY, strictHeight, entity);
             if (exactPos != null) {
                 return exactPos;
             }
         }
 
-        // STAGE 2: Expanding square search
+        // STAGE 2: Expanding search
         Vec3d foundPos = searchExpandingSquare(data, world, centerX, centerZ,
-                heightMode, preferredY, strictHeight,
-                searchRadius, maxAttempts);
+                heightMode, preferredY, strictHeight, searchRadius, maxAttempts, entity);
         if (foundPos != null) {
             return foundPos;
         }
 
-        // STAGE 3: Platform generation if configured
+        // STAGE 3: Platform generation
         if (generatePlatform) {
             boolean overVoid = isColumnEmpty(world, centerX, centerZ);
             boolean overLiquid = isOverLiquidColumn(data, world, centerX, centerZ);
 
             if (overVoid || overLiquid) {
-                FrostedLib.LOGGER.info("test");
-                return generateEmergencyPlatform(data, world, centerX, centerZ, overVoid);
+                return generateEmergencyPlatform(data, world, centerX, centerZ, overVoid, entity);
             }
         }
 
-        // STAGE 4: Fallback strategies
+        // STAGE 4: Fallback
         if (!strictHeight) {
-            return getFallbackPosition(data, world, centerX, centerZ, heightMode, preferredY);
+            return getFallbackPosition(data, world, centerX, centerZ, heightMode, preferredY, entity);
         }
 
         return null;
@@ -95,15 +90,12 @@ public class PositionFinder {
     private Vec3d searchExpandingSquare(SerializableData.Instance data, ServerWorld world,
                                         int centerX, int centerZ, String heightMode,
                                         double preferredY, boolean strictHeight,
-                                        int maxRadius, int maxAttempts) {
+                                        int maxRadius, int maxAttempts, Entity entity) {
 
         WorldBorder worldBorder = world.getWorldBorder();
-        BlockPos.Mutable mutablePos = new BlockPos.Mutable();
         int attempts = 0;
 
-        // Use expanding square pattern
         for (int radius = 1; radius <= maxRadius && attempts < maxAttempts; radius *= 2) {
-            // Iterate in a square around the center point
             for (BlockPos pos : BlockPos.iterateInSquare(new BlockPos(centerX, 0, centerZ),
                     radius, Direction.EAST, Direction.SOUTH)) {
 
@@ -112,15 +104,13 @@ public class PositionFinder {
                 int x = pos.getX();
                 int z = pos.getZ();
 
-                // Check world border
-                mutablePos.set(x, (int)preferredY, z);
-                if (!worldBorder.contains(mutablePos)) {
+                // World border check
+                if (!worldBorder.contains(x, (int) preferredY, z)) {
                     continue;
                 }
 
-                // Try this column
                 Vec3d candidate = findPositionAtColumn(data, world, x, z,
-                        heightMode, preferredY, strictHeight);
+                        heightMode, preferredY, strictHeight, entity);
                 if (candidate != null) {
                     return candidate;
                 }
@@ -134,13 +124,13 @@ public class PositionFinder {
 
     private Vec3d findPositionAtColumn(SerializableData.Instance data, ServerWorld world,
                                        int x, int z, String heightMode,
-                                       double preferredY, boolean strictHeight) {
+                                       double preferredY, boolean strictHeight, Entity entity) {
 
         return switch (heightMode) {
-            case HEIGHT_FIXED -> findPositionAtFixedY(data, world, x, z, (int)preferredY, strictHeight);
-            case HEIGHT_RELATIVE -> findPositionAroundY(data, world, x, z, (int)preferredY, strictHeight);
-            case HEIGHT_UNEXPOSED -> findUnexposedPosition(data, world, x, z, (int)preferredY, strictHeight);
-            default -> findExposedPosition(data, world, x, z, strictHeight);
+            case HEIGHT_FIXED -> findPositionAtFixedY(data, world, x, z, (int) preferredY, strictHeight, entity);
+            case HEIGHT_RELATIVE -> findPositionAroundY(data, world, x, z, (int) preferredY, strictHeight, entity);
+            case HEIGHT_UNEXPOSED -> findUnexposedPosition(data, world, x, z, (int) preferredY, strictHeight, entity);
+            default -> findExposedPosition(data, world, x, z, strictHeight, entity);
         };
     }
 
@@ -149,10 +139,9 @@ public class PositionFinder {
     /* ------------------------------------------------------------ */
 
     private Vec3d findPositionAtFixedY(SerializableData.Instance data, ServerWorld world,
-                                       int x, int z, int targetY, boolean strictHeight) {
+                                       int x, int z, int targetY, boolean strictHeight, Entity entity) {
 
-        // Check if position is valid at exactly targetY
-        if (isPositionValid(data, world, x, targetY, z)) {
+        if (isPositionValid(data, world, x, targetY, z, entity)) {
             return toCenterVec3d(x, targetY, z);
         }
 
@@ -160,15 +149,13 @@ public class PositionFinder {
             return null;
         }
 
-        // Search vertically around targetY
-        return searchVertically(data, world, x, z, targetY);
+        return searchVertically(data, world, x, z, targetY, entity);
     }
 
     private Vec3d findPositionAroundY(SerializableData.Instance data, ServerWorld world,
-                                      int x, int z, int referenceY, boolean strictHeight) {
+                                      int x, int z, int referenceY, boolean strictHeight, Entity entity) {
 
-        // Start from referenceY and search both directions
-        Vec3d found = searchVertically(data, world, x, z, referenceY);
+        Vec3d found = searchVertically(data, world, x, z, referenceY, entity);
         if (found != null) {
             return found;
         }
@@ -177,29 +164,20 @@ public class PositionFinder {
             return null;
         }
 
-        // Attempt to fall back to surface
-        found = getSurfacePosition(world, x, z);
-        if (found != null && isPositionValid(data, world, (int)found.x, (int)found.y, (int)found.z)) {
-            return found;
-        }
-
-        return null;
+        // Fallback to surface position
+        return findExposedPosition(data, world, x, z, false, entity);
     }
 
     private Vec3d findUnexposedPosition(SerializableData.Instance data, ServerWorld world,
-                                        int x, int z, int startY, boolean strictHeight) {
+                                        int x, int z, int startY, boolean strictHeight, Entity entity) {
 
-        int topY = world.getTopY();
         int bottomY = world.getBottomY();
-        int searchStartY = Math.min(startY, topY - 1);
+        int searchY = Math.min(startY, world.getTopY() - 1);
 
-        // Search downward for first unexposed position
-        for (int y = searchStartY; y >= bottomY; y--) {
-            BlockPos pos = new BlockPos(x, y, z);
-
-            // Check if position is not exposed to the sky
-            if (!isSkyAbove(world, pos)) {
-                if (isPositionValid(data, world, x, y, z)) {
+        // Search downward for first unexposed valid position
+        for (int y = searchY; y >= bottomY; y--) {
+            if (!isSkyAbove(world, new BlockPos(x, y, z))) {
+                if (isPositionValid(data, world, x, y, z, entity)) {
                     return toCenterVec3d(x, y, z);
                 }
             }
@@ -209,32 +187,26 @@ public class PositionFinder {
             return null;
         }
 
-        // Fall back to any valid position
-        return searchVertically(data, world, x, z, startY);
+        return searchVertically(data, world, x, z, startY, entity);
     }
 
     private Vec3d findExposedPosition(SerializableData.Instance data, ServerWorld world,
-                                      int x, int z, boolean strictHeight) {
+                                      int x, int z, boolean strictHeight, Entity entity) {
 
-        // Get surface position with proper liquid safety
-        Vec3d surfacePos = getSurfacePosition(world, x, z);
-        if (surfacePos != null) {
-            BlockPos pos = new BlockPos((int)surfacePos.x, (int)surfacePos.y, (int)surfacePos.z);
+        // Get surface position
+        int surfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z);
+        BlockPos surfacePos = new BlockPos(x, surfaceY, z);
 
-            // Check if position is exposed to the sky
-            if (isSkyAbove(world, pos) && isPositionValid(data, world, x, (int)surfacePos.y, z)) {
-                return surfacePos;
-            }
+        // Check surface position
+        if (isSkyAbove(world, surfacePos) && isPositionValid(data, world, x, surfaceY, z, entity)) {
+            return toCenterVec3d(x, surfaceY, z);
         }
 
         if (strictHeight) {
-            // Search upward from surface for exposed position
-            int surfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z);
+            // Search upward for exposed position
             for (int y = surfaceY; y <= world.getTopY(); y++) {
                 BlockPos pos = new BlockPos(x, y, z);
-
-                // Check if position is exposed to the sky
-                if (isSkyAbove(world, pos) && isPositionValid(data, world, x, y, z)) {
+                if (isSkyAbove(world, pos) && isPositionValid(data, world, x, y, z, entity)) {
                     return toCenterVec3d(x, y, z);
                 }
             }
@@ -244,23 +216,23 @@ public class PositionFinder {
     }
 
     private Vec3d searchVertically(SerializableData.Instance data, ServerWorld world,
-                                   int x, int z, int centerY) {
+                                   int x, int z, int centerY, Entity entity) {
 
         int topY = world.getTopY();
         int bottomY = world.getBottomY();
 
-        // Search in both directions from center
+        // Search outward from center
         for (int offset = 0; offset <= VERTICAL_SEARCH_RANGE; offset++) {
             // Try above
             int yAbove = centerY + offset;
-            if (yAbove <= topY && isPositionValid(data, world, x, yAbove, z)) {
+            if (yAbove <= topY && isPositionValid(data, world, x, yAbove, z, entity)) {
                 return toCenterVec3d(x, yAbove, z);
             }
 
-            // Try below (skip offset 0 to avoid checking centerY twice)
+            // Try below (skip offset 0)
             if (offset > 0) {
                 int yBelow = centerY - offset;
-                if (yBelow >= bottomY && isPositionValid(data, world, x, yBelow, z)) {
+                if (yBelow >= bottomY && isPositionValid(data, world, x, yBelow, z, entity)) {
                     return toCenterVec3d(x, yBelow, z);
                 }
             }
@@ -270,189 +242,196 @@ public class PositionFinder {
     }
 
     /* ------------------------------------------------------------ */
-    /*  Position validation                                         */
+    /*  Position Validation                                         */
     /* ------------------------------------------------------------ */
 
     private boolean isPositionValid(SerializableData.Instance data, ServerWorld world,
-                                    int x, int y, int z) {
+                                    int x, int y, int z, Entity entity) {
 
+        // Basic bounds check
         if (y < world.getBottomY() || y >= world.getTopY()) {
             return false;
         }
 
-        BlockPos feetPos = new BlockPos(x, y, z);
-        BlockPos headPos = new BlockPos(x, y + 1, z);
-        BlockPos groundPos = new BlockPos(x, y - 1, z);
+        // Create entity hitbox at this position
+        Box entityHitbox = createEntityHitbox(x + 0.5, y, z + 0.5, entity);
 
-        // Check for void
-        if (isColumnEmpty(world, x, z)) {
+        // Check all requirements in optimal order
+        return world.getWorldBorder().contains(entityHitbox)
+                && !isColumnEmpty(world, x, z)
+                && !containsUnsafeLiquids(data, world, entityHitbox)
+                && isHitboxVolumeEmpty(world, entityHitbox, entity)
+                && hasSolidGround(world, entityHitbox);
+    }
+
+    private boolean isHitboxVolumeEmpty(ServerWorld world, Box hitbox, Entity entity) {
+        // Calculate the integer bounds we need to check
+        int minX = MathHelper.floor(hitbox.minX);
+        int maxX = MathHelper.floor(hitbox.maxX);
+        int minY = MathHelper.floor(hitbox.minY);
+        int maxY = MathHelper.floor(hitbox.maxY);
+        int minZ = MathHelper.floor(hitbox.minZ);
+        int maxZ = MathHelper.floor(hitbox.maxZ);
+
+        BlockPos.Mutable mutablePos = new BlockPos.Mutable();
+        ShapeContext shapeContext = ShapeContext.of(entity);
+
+        // Only check blocks that intersect the hitbox
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    mutablePos.set(x, y, z);
+                    BlockState state = world.getBlockState(mutablePos);
+
+                    // Skip air and replaceable blocks immediately
+                    if (state.isAir() || state.isReplaceable()) {
+                        continue;
+                    }
+
+                    // Get collision shape and check intersection
+                    VoxelShape collisionShape = state.getCollisionShape(world, mutablePos, shapeContext);
+                    if (!collisionShape.isEmpty()) {
+                        // Only check intersection if there's actual collision
+                        Box blockBox = collisionShape.getBoundingBox().offset(mutablePos);
+                        if (hitbox.intersects(blockBox)) {
+                            return false; // Block would collide
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private boolean hasSolidGround(ServerWorld world, Box hitbox) {
+        int minX = MathHelper.floor(hitbox.minX);
+        int maxX = MathHelper.floor(hitbox.maxX);
+        int minZ = MathHelper.floor(hitbox.minZ);
+        int maxZ = MathHelper.floor(hitbox.maxZ);
+        int groundY = MathHelper.floor(hitbox.minY) - 1;
+
+        BlockPos.Mutable mutablePos = new BlockPos.Mutable();
+
+        // Check if any block under the footprint provides support
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                mutablePos.set(x, groundY, z);
+                if (world.getBlockState(mutablePos).isSolidBlock(world, mutablePos)) {
+                    return true; // Found solid ground
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean containsUnsafeLiquids(SerializableData.Instance data, ServerWorld world, Box hitbox) {
+        // Quick early exit if no liquid conditions are configured
+        boolean liquidsSafe = data.getBoolean("liquids_safe");
+        ConditionFactory<FluidState>.Instance liquidCondition = data.get("liquid_condition");
+
+        if (liquidCondition == null && liquidsSafe) {
+            return false; // All liquids are safe, no need to check
+        }
+
+        // Only check if we need to validate liquids
+        int minX = MathHelper.floor(hitbox.minX);
+        int maxX = MathHelper.floor(hitbox.maxX);
+        int minY = MathHelper.floor(hitbox.minY);
+        int maxY = MathHelper.floor(hitbox.maxY);
+        int minZ = MathHelper.floor(hitbox.minZ);
+        int maxZ = MathHelper.floor(hitbox.maxZ);
+
+        BlockPos.Mutable mutablePos = new BlockPos.Mutable();
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    mutablePos.set(x, y, z);
+                    if (isLiquidUnsafe(data, world, mutablePos)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isLiquidUnsafe(SerializableData.Instance data, ServerWorld world, BlockPos pos) {
+        FluidState fluidState = world.getFluidState(pos);
+        boolean hasFluid = !fluidState.isEmpty();
+
+        if (!hasFluid) {
             return false;
         }
 
-        // Check for unsafe liquids
-        if (isLiquidUnsafe(data, world, feetPos) ||
-                isLiquidUnsafe(data, world, headPos) ||
-                isLiquidUnsafe(data, world, groundPos)) {
-            return false;
+        ConditionFactory<FluidState>.Instance liquidCondition = data.get("liquid_condition");
+        boolean liquidsSafe = data.getBoolean("liquids_safe");
+
+        // No condition configured
+        if (liquidCondition == null) {
+            return !liquidsSafe; // If liquids_safe is false, any fluid is unsafe
         }
 
-        BlockState feetState = world.getBlockState(feetPos);
-        BlockState headState = world.getBlockState(headPos);
-        BlockState groundState = world.getBlockState(groundPos);
+        // Condition configured
+        try {
+            boolean conditionMatches = liquidCondition.test(fluidState);
 
-        // Feet must be passable or replaceable
-        if (isBlockNotPassableOrReplaceable(feetState, world, feetPos)) {
-            return false;
+            if (liquidsSafe) {
+                // Only condition-specified liquids are safe
+                return !conditionMatches;
+            } else {
+                // Only condition-specified liquids are unsafe
+                return conditionMatches;
+            }
+        } catch (Exception e) {
+            FrostedLib.LOGGER.warn("Failed to evaluate liquid condition at {}: {}", pos, e.getMessage());
+            return !liquidsSafe; // Fallback
         }
-
-        // Head must be passable or replaceable
-        if (isBlockNotPassableOrReplaceable(headState, world, headPos)) {
-            return false;
-        }
-
-        // Ground must be solid
-        return isSolidGround(groundState, world, groundPos);
     }
 
     private boolean isColumnEmpty(ServerWorld world, int x, int z) {
+        BlockPos.Mutable mutable = new BlockPos.Mutable(x, world.getBottomY(), z);
+
         for (int y = world.getBottomY(); y < world.getTopY(); y++) {
-            BlockPos pos = new BlockPos(x, y, z);
-            if (world.getBlockState(pos).isSolidBlock(world, pos)) {
+            mutable.setY(y);
+            if (world.getBlockState(mutable).isSolidBlock(world, mutable)) {
                 return false;
             }
         }
         return true;
     }
 
-    private boolean isSolidGround(BlockState state, ServerWorld world, BlockPos pos) {
-        // Must be a solid block that can support entities
-        return state.isSolidBlock(world, pos);
-    }
-
-    private boolean isBlockNotPassableOrReplaceable(BlockState state, ServerWorld world, BlockPos pos) {
-        // Check if block is air
-        if (state.isAir()) {
-            return false;
-        }
-
-        // Check if block is replaceable (like tall grass, flowers, etc.)
-        if (state.isReplaceable()) {
-            return false;
-        }
-
-        // Check if block is not a full cube (like fences, slabs, etc.)
-        if (!state.isOpaqueFullCube(world, pos)) {
-            return false;
-        }
-
-        // For non-solid blocks like glass panes, fences, etc.
-        return state.isSolidBlock(world, pos);
-    }
-
-    /* ------------------------------------------------------------ */
-    /*  Surface and liquid handling                                 */
-    /* ------------------------------------------------------------ */
-
-    private Vec3d getSurfacePosition(ServerWorld world, int x, int z) {
-        // Get world surface height
-        int surfaceY = world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z);
-
-        // Find the first air block above solid ground
-        for (int y = surfaceY; y >= world.getBottomY(); y--) {
-            BlockPos pos = new BlockPos(x, y, z);
-            BlockPos abovePos = pos.up();
-
-            BlockState state = world.getBlockState(pos);
-            BlockState aboveState = world.getBlockState(abovePos);
-
-            if (isSolidGround(state, world, pos) &&
-                    (aboveState.isAir() || aboveState.isReplaceable())) {
-                return toCenterVec3d(x, y + 1, z);
-            }
-        }
-
-        return null;
-    }
-
-    private boolean isLiquidUnsafe(SerializableData.Instance data,
-                                   ServerWorld world, BlockPos pos) {
-
-        FluidState fluidState = world.getFluidState(pos);
-
-        // Check if there's any fluid at this position
-        boolean hasFluid = !fluidState.isEmpty();
-
-        // Get the liquid condition if configured
-        ConditionFactory<FluidState>.Instance liquidCondition = data.get("liquid_condition");
-        boolean liquidsSafe = data.getBoolean("liquids_safe");
-
-        // CASE 1: No liquid condition configured
-        // if liquids_safe is false, any liquid is unsafe
-        // If liquids_safe is true, all liquids are safe
-        if (liquidCondition == null) {
-            return !liquidsSafe && hasFluid;
-        }
-
-        // CASE 2: Liquid condition IS configured
-        // if liquids_safe is false, only condition-specified liquids are unsafe
-        // If liquids_safe is true, only condition-specified liquids are safe
-        boolean conditionMatches;
-        try {
-            // Test against FluidState (not BlockState)
-            conditionMatches = liquidCondition.test(fluidState);
-
-            if (liquidsSafe) {
-                return hasFluid && !conditionMatches;
-            } else {
-                return hasFluid && conditionMatches;
-            }
-        } catch (Exception e) {
-            // If condition evaluation fails, log with full stack trace
-            FrostedLib.LOGGER.warn("Failed to evaluate liquid condition at position {}: {}",
-                    pos, e.getMessage(), e);
-            // Fallback to CASE 1 behavior
-            return !liquidsSafe && hasFluid;
-        }
-    }
-
-    private boolean isOverLiquidColumn(SerializableData.Instance data,
-                                       ServerWorld world, int x, int z) {
+    private boolean isOverLiquidColumn(SerializableData.Instance data, ServerWorld world, int x, int z) {
         BlockPos.Mutable mutable = new BlockPos.Mutable(x, world.getTopY(), z);
 
         for (int y = world.getTopY(); y >= world.getBottomY(); y--) {
             mutable.setY(y);
-
-            // Check if this position has fluid AND if it's unsafe
             if (!world.getFluidState(mutable).isEmpty() &&
                     isLiquidUnsafe(data, world, mutable)) {
-                return true; // Found unsafe liquid
+                return true;
             }
         }
 
-        return false; // No unsafe liquids found
+        return false;
     }
 
     private boolean isSkyAbove(ServerWorld world, BlockPos pos) {
-        int worldTopY = world.getTopY();
         BlockPos.Mutable mutable = new BlockPos.Mutable(pos.getX(), pos.getY(), pos.getZ());
 
-        for (int y = pos.getY() + 1; y <= worldTopY; y++) {
+        for (int y = pos.getY() + 1; y <= world.getTopY(); y++) {
             mutable.setY(y);
             BlockState state = world.getBlockState(mutable);
 
-            // Skip air and obviously non-blocking blocks
-            if (state.isAir() || state.isReplaceable()) {
+            // Skip transparent/non-blocking blocks
+            if (state.isAir() || state.isReplaceable() || !state.isOpaque()) {
                 continue;
             }
 
-            // Skip translucent blocks (glass, leaves, etc.)
-            if (!state.isOpaque()) {
-                continue;
-            }
-
-            // If it's solid or opaque, it blocks the sky
-            if (state.isSolidBlock(world, mutable) ||
-                    state.isOpaqueFullCube(world, mutable)) {
+            // Solid/opaque blocks block the sky
+            if (state.isSolidBlock(world, mutable) || state.isOpaqueFullCube(world, mutable)) {
                 return false;
             }
         }
@@ -461,36 +440,50 @@ public class PositionFinder {
     }
 
     /* ------------------------------------------------------------ */
-    /*  Platform generation                                         */
+    /*  Platform Generation                                         */
     /* ------------------------------------------------------------ */
 
     private Vec3d generateEmergencyPlatform(SerializableData.Instance data,
-                                            ServerWorld world, int x, int z, boolean overVoid) {
+                                            ServerWorld world, int x, int z,
+                                            boolean overVoid, Entity entity) {
 
-        int platformY;
-        if (overVoid) {
-            // Platform above void
-            platformY = Math.max(world.getBottomY() + PLATFORM_HEIGHT_ABOVE_VOID,
-                    world.getSeaLevel());
-        } else {
-            // Platform above liquid - find the highest unsafe liquid surface
-            platformY = findLiquidSurface(data, world, x, z);
-        }
+        int platformY = overVoid ?
+                Math.max(world.getBottomY() + PLATFORM_HEIGHT_ABOVE_VOID, world.getSeaLevel()) :
+                findLiquidSurface(data, world, x, z);
 
-        // Ensure platform is within world bounds
         platformY = MathHelper.clamp(platformY,
                 world.getBottomY() + 1,
                 world.getTopY() - 1);
 
-        // Use the PlatformGenerator to create the platform
+        if (!isPlatformPositionValid(world, x, platformY, z, entity)) {
+            return null; // Position not suitable for platform generation
+        }
+
         FrostedLib.LOGGER.info("Generated platform at [{}, {}, {}] in dimension {}",
                 x, platformY, z, world.getRegistryKey().getValue());
 
         return platformGenerator.generatePlatformAtPosition(data, world, x, z, platformY);
     }
 
-    private int findLiquidSurface(SerializableData.Instance data,
-                                  ServerWorld world, int x, int z) {
+    private boolean isPlatformPositionValid(ServerWorld world, int x, int y, int z, Entity entity) {
+        // Basic bounds check
+        if (y < world.getBottomY() || y >= world.getTopY()) {
+            return false;
+        }
+
+        // Create entity hitbox at this position
+        Box entityHitbox = createEntityHitbox(x + 0.5, y, z + 0.5, entity);
+
+        // Check world border
+        if (!world.getWorldBorder().contains(entityHitbox)) {
+            return false;
+        }
+
+        // Check that hitbox volume is clear
+        return isHitboxVolumeEmpty(world, entityHitbox, entity);
+    }
+
+    private int findLiquidSurface(SerializableData.Instance data, ServerWorld world, int x, int z) {
         BlockPos.Mutable mutable = new BlockPos.Mutable(x, world.getTopY(), z);
         int highestUnsafeY = Integer.MIN_VALUE;
 
@@ -498,15 +491,11 @@ public class PositionFinder {
             mutable.setY(y);
             FluidState fluidState = world.getFluidState(mutable);
 
-            // Check if this position has fluid AND if it's unsafe
             if (!fluidState.isEmpty() && isLiquidUnsafe(data, world, mutable)) {
-
-                // Check if the block above is air (this is a liquid surface)
-                mutable.setY(y + 1);
-                if (world.getBlockState(mutable).isAir()) {
+                // Check if block above is air (liquid surface)
+                if (world.getBlockState(mutable.up()).isAir()) {
                     highestUnsafeY = Math.max(highestUnsafeY, y);
                 }
-                mutable.setY(y); // Reset Y for next iteration
             }
         }
 
@@ -516,6 +505,19 @@ public class PositionFinder {
     /* ------------------------------------------------------------ */
     /*  Helper methods                                              */
     /* ------------------------------------------------------------ */
+
+    private Box createEntityHitbox(double centerX, double feetY, double centerZ, Entity entity) {
+        var dimensions = entity.getDimensions(entity.getPose());
+        float radius = dimensions.width / 2.0f;
+        float height = dimensions.height;
+
+        return new Box(
+                centerX - radius, feetY,
+                centerZ - radius,
+                centerX + radius, feetY + height,
+                centerZ + radius
+        );
+    }
 
     private double resolvePreferredY(SerializableData.Instance data, Entity entity, String mode) {
         return switch (mode) {
@@ -529,14 +531,13 @@ public class PositionFinder {
     }
 
     private Vec3d getFallbackPosition(SerializableData.Instance data, ServerWorld world,
-                                      int x, int z, String originalMode, double preferredY) {
+                                      int x, int z, String originalMode,
+                                      double preferredY, Entity entity) {
 
         if (originalMode.equals(HEIGHT_EXPOSED) || originalMode.equals(HEIGHT_FIXED)) {
-            // Try unexposed as fallback
-            return findUnexposedPosition(data, world, x, z, (int)preferredY, false);
+            return findUnexposedPosition(data, world, x, z, (int) preferredY, false, entity);
         } else {
-            // Try exposed as fallback
-            return findExposedPosition(data, world, x, z, false);
+            return findExposedPosition(data, world, x, z, false, entity);
         }
     }
 
