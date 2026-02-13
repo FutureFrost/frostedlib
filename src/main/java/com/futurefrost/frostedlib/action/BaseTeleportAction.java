@@ -25,7 +25,6 @@ public abstract class BaseTeleportAction {
     protected static SerializableData createCommonDataWithoutHeightDefault() {
         return new SerializableData()
                 .add("target_dimension", SerializableDataTypes.IDENTIFIER, null)
-                .add("bring_mount", SerializableDataTypes.BOOLEAN, true)
                 .add("generate_platform", SerializableDataTypes.BOOLEAN, false)
                 .add("max_search_attempts", SerializableDataTypes.INT, 50)
                 .add("on_error", ApoliDataTypes.ENTITY_ACTION, null)
@@ -51,13 +50,11 @@ public abstract class BaseTeleportAction {
     protected final ErrorHandler errorHandler;
     protected final PositionFinder positionFinder;
     protected final PlatformGenerator platformGenerator;
-    protected final MountHandler mountHandler;
 
     public BaseTeleportAction() {
         this.errorHandler = new ErrorHandler();
         this.positionFinder = new PositionFinder();
         this.platformGenerator = new PlatformGenerator();
-        this.mountHandler = new MountHandler();
     }
 
     // Template method pattern - subclasses implement specific logic
@@ -127,9 +124,28 @@ public abstract class BaseTeleportAction {
                     return;
                 }
 
-                // 5. Handle teleport with mount
-                boolean success = mountHandler.teleportWithMount(entity, targetWorld, safePosition,
-                        data.getBoolean("bring_mount"));
+                // 5. Handle teleport
+                boolean success;
+                if (entity instanceof ServerPlayerEntity player) {
+                    TeleportHelper.teleportPlayer(player, targetWorld, safePosition, player.getYaw(), player.getPitch());
+                    success = true;
+                } else {
+                    try {
+                        entity.teleport(
+                                targetWorld,
+                                safePosition.x,
+                                safePosition.y,
+                                safePosition.z,
+                                java.util.Set.of(),
+                                entity.getYaw(),
+                                entity.getPitch()
+                        );
+                        success = true;
+                    } catch (Exception e) {
+                        FrostedLib.LOGGER.error("Teleportation failed", e);
+                        success = false;
+                    }
+                }
 
                 if (!success) {
                     errorHandler.handleTeleportFailed(data, entity);
