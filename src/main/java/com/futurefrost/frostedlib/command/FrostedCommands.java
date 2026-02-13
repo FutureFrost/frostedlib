@@ -65,6 +65,20 @@ public class FrostedCommands {
                         )
                 )
 
+                // Copy command: /frostedlib copy <target> <source_id> <target_id> [overwrite]
+                .then(CommandManager.literal("copy")
+                        .then(CommandManager.argument("target", EntityArgumentType.entities())
+                                .then(CommandManager.argument("source_id", StringArgumentType.word())
+                                        .then(CommandManager.argument("target_id", StringArgumentType.word())
+                                                .executes(FrostedCommands::copyPosition)  // Default: no overwrite
+                                                .then(CommandManager.literal("overwrite")
+                                                        .executes(context -> copyPosition(context, true))
+                                                )
+                                        )
+                                )
+                        )
+                )
+
                 // List command: /frostedlib list <target>
                 .then(CommandManager.literal("list")
                         .then(CommandManager.argument("target", EntityArgumentType.entity())
@@ -299,7 +313,7 @@ public class FrostedCommands {
         int failCount = 0;
 
         for (Entity entity : targets) {
-            boolean removed = false;
+            boolean removed;
 
             // Remove from appropriate component based on entity type
             if (entity instanceof ServerPlayerEntity player) {
@@ -329,6 +343,77 @@ public class FrostedCommands {
             return successCount;
         } else {
             source.sendError(Text.literal("No entities had a saved position with ID '" + id + "'"));
+            return 0;
+        }
+    }
+
+    private static int copyPosition(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+        return copyPosition(context, false);  // Default: overwrite
+    }
+
+    private static int copyPosition(CommandContext<ServerCommandSource> context, boolean overwrite) throws CommandSyntaxException {
+        ServerCommandSource source = context.getSource();
+        Collection<? extends Entity> targets = EntityArgumentType.getEntities(context, "target");
+        String sourceId = StringArgumentType.getString(context, "source_id");
+        String targetId = StringArgumentType.getString(context, "target_id");
+
+        int successCount = 0;
+        int failCount = 0;
+        int skipCount = 0;
+
+        for (Entity entity : targets) {
+            // Get source position
+            Optional<PositionData> sourcePosition = getSavedPosition(entity, sourceId);
+
+            if (sourcePosition.isEmpty()) {
+                failCount++;
+                continue;
+            }
+
+            // Check if target exists
+            Optional<PositionData> targetPosition = getSavedPosition(entity, targetId);
+
+            if (!overwrite && targetPosition.isPresent()) {
+                skipCount++;
+                continue;
+            }
+
+            // Copy the position
+            if (entity instanceof ServerPlayerEntity player) {
+                PlayerDataComponent playerData = ModComponents.PLAYER_DATA.get(player);
+                playerData.savePosition(targetId, sourcePosition.get());
+            } else {
+                EntityDataComponent entityData = ModComponents.ENTITY_DATA.get(entity);
+                entityData.savePosition(targetId, sourcePosition.get());
+            }
+
+            successCount++;
+        }
+
+        // Build feedback message
+        StringBuilder feedback = new StringBuilder();
+        feedback.append("Copied position '").append(sourceId).append("' to '").append(targetId).append("'");
+
+        if (successCount > 0) {
+            feedback.append(" for ").append(successCount).append(" entity").append(successCount == 1 ? "" : "s");
+        }
+
+        if (skipCount > 0) {
+            feedback.append(" (").append(skipCount).append(" skipped - target already exists)");
+        }
+
+        if (failCount > 0) {
+            feedback.append(" (").append(failCount).append(" failed - source not found)");
+        }
+
+        if (successCount > 0) {
+            source.sendFeedback(() -> Text.literal(feedback.toString()), true);
+            return successCount;
+        } else if (skipCount > 0) {
+            source.sendError(Text.literal("No positions copied: All targets already have position '" + targetId + "' (use overwrite to replace)"));
+            return 0;
+        } else {
+            source.sendError(Text.literal("Failed to copy: No targets had source position '" + sourceId + "'"));
             return 0;
         }
     }
