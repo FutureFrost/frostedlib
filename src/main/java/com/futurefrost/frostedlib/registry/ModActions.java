@@ -36,6 +36,14 @@ public class ModActions {
 
         Registry.register(
                 ApoliRegistries.ENTITY_ACTION,
+                Identifier.of(FrostedLib.MOD_ID, "remove_pos"),
+                RemovePositionAction.getFactory()
+        );
+
+        FrostedLib.LOGGER.info("remove_pos registered");
+
+        Registry.register(
+                ApoliRegistries.ENTITY_ACTION,
                 Identifier.of(FrostedLib.MOD_ID, "relative_teleport"),
                 RelativeTeleportAction.getFactory()
         );

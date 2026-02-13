@@ -56,6 +56,15 @@ public class FrostedCommands {
                         )
                 )
 
+                // Remove command: /frostedlib remove <target> <id>
+                .then(CommandManager.literal("remove")
+                        .then(CommandManager.argument("target", EntityArgumentType.entities())
+                                .then(CommandManager.argument("id", StringArgumentType.word())
+                                        .executes(FrostedCommands::removePosition)
+                                )
+                        )
+                )
+
                 // List command: /frostedlib list <target>
                 .then(CommandManager.literal("list")
                         .then(CommandManager.argument("target", EntityArgumentType.entity())
@@ -274,6 +283,54 @@ public class FrostedCommands {
                 entity.getPitch()
         );
         return true;
+    }
+
+    private static int removePosition(CommandContext<ServerCommandSource> context) {
+        ServerCommandSource source = context.getSource();
+        Collection<? extends Entity> targets;
+        try {
+            targets = EntityArgumentType.getEntities(context, "target");
+        } catch (CommandSyntaxException e) {
+            throw new RuntimeException(e);
+        }
+        String id = StringArgumentType.getString(context, "id");
+
+        int successCount = 0;
+        int failCount = 0;
+
+        for (Entity entity : targets) {
+            boolean removed = false;
+
+            // Remove from appropriate component based on entity type
+            if (entity instanceof ServerPlayerEntity player) {
+                PlayerDataComponent playerData = ModComponents.PLAYER_DATA.get(player);
+                removed = playerData.removePosition(id);
+            } else {
+                EntityDataComponent entityData = ModComponents.ENTITY_DATA.get(entity);
+                removed = entityData.removePosition(id);
+            }
+
+            if (removed) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        }
+
+        if (successCount > 0) {
+            int finalSuccessCount = successCount;
+            int finalFailCount = failCount;
+            source.sendFeedback(() ->
+                            Text.literal("Removed position '" + id + "' from " + finalSuccessCount + " entity" +
+                                    (finalSuccessCount == 1 ? "" : "s") +
+                                    (finalFailCount > 0 ? " (" + finalFailCount + " had no such position)" : "")),
+                    true
+            );
+            return successCount;
+        } else {
+            source.sendError(Text.literal("No entities had a saved position with ID '" + id + "'"));
+            return 0;
+        }
     }
 
     private static int listPositions(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
