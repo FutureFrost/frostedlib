@@ -1,6 +1,5 @@
 package com.futurefrost.frostedlib.action;
 
-import io.github.apace100.apoli.data.ApoliDataTypes;
 import io.github.apace100.apoli.power.factory.action.ActionFactory;
 import io.github.apace100.calio.data.SerializableData;
 import io.github.apace100.calio.data.SerializableDataTypes;
@@ -23,22 +22,9 @@ public class StructureTeleportAction extends BaseTeleportAction {
     private static final SerializableData DATA;
 
     static {
-        DATA = new SerializableData()
-                .add("target_dimension", SerializableDataTypes.IDENTIFIER, null)
-                .add("bring_mount", SerializableDataTypes.BOOLEAN, true)
-                .add("generate_platform", SerializableDataTypes.BOOLEAN, false)
-                .add("max_search_attempts", SerializableDataTypes.INT, 50)
-                .add("on_error", ApoliDataTypes.ENTITY_ACTION, null)
-                .add("platform_block", SerializableDataTypes.IDENTIFIER, Identifier.of("minecraft", "obsidian"))
-                .add("platform_shape", SerializableDataTypes.STRING, "square")
-                .add("platform_size", SerializableDataTypes.INT, 3)
-                .add("random_offset", SerializableDataTypes.DOUBLE, 0.0)
-                .add("search_radius", SerializableDataTypes.INT, 32)
-                .add("show_message", SerializableDataTypes.BOOLEAN, false)
-                // REMOVED: target_height, strict_height for structure teleport
-                .add("liquids_safe", SerializableDataTypes.BOOLEAN, false)
-                .add("liquid_condition", ApoliDataTypes.BLOCK_CONDITION, null)
-                .add("error_message", SerializableDataTypes.STRING, null)
+        DATA = createCommonDataWithoutHeightDefault()
+                .add("target_height", SerializableDataTypes.STRING, "exposed") // Add default for structure
+                .add("strict_height", SerializableDataTypes.BOOLEAN, false)
                 // Structure specific fields
                 .add("structure_id", SerializableDataTypes.IDENTIFIER)
                 .add("chunk_search_radius", SerializableDataTypes.INT, 100)
@@ -86,15 +72,9 @@ public class StructureTeleportAction extends BaseTeleportAction {
         // Get the center of the structure's bounding box
         BlockPos structureCenter = new BlockPos(structureStart.getBoundingBox().getCenter());
 
-        // Find a safe position within the structure bounds
-        BlockPos safePos = findSafePositionInStructure(world, structureStart, structureCenter);
-
-        if (safePos != null) {
-            return new Vec3d(safePos.getX() + 0.5, safePos.getY(), safePos.getZ() + 0.5);
-        }
-
-        // Fallback to structure center
-        return new Vec3d(structureCenter.getX() + 0.5, structureCenter.getY(), structureCenter.getZ() + 0.5);
+        // Return the structure center - PositionFinder will handle the safe position search
+        // with proper height mode configuration
+        return new Vec3d(structureCenter.getX(), 64, structureCenter.getZ()); // Y=64 as reference point
     }
 
     private Optional<Pair<BlockPos, Structure>> getStructurePos(ServerWorld world, Identifier structureId,
@@ -129,7 +109,7 @@ public class StructureTeleportAction extends BaseTeleportAction {
                 .locateStructure(
                         world,
                         structureRegistryEntryList,
-                        searchCenter,  // KEY FIX: Use scaled position
+                        searchCenter,
                         radius,
                         false
                 );
@@ -139,43 +119,6 @@ public class StructureTeleportAction extends BaseTeleportAction {
         }
 
         return Optional.of(new Pair<>(structurePos.getFirst(), structurePos.getSecond().value()));
-    }
-
-    private BlockPos findSafePositionInStructure(ServerWorld world, StructureStart structureStart, BlockPos center) {
-        // Search within the structure's bounding box
-        BlockBox bounds = structureStart.getBoundingBox();
-
-        // Start from the center and search outward
-        for (int radius = 0; radius < 16; radius++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
-                        continue; // Only check the perimeter at each radius
-                    }
-
-                    int x = center.getX() + dx;
-                    int z = center.getZ() + dz;
-
-                    // Ensure we're within structure bounds
-                    if (x < bounds.getMinX() || x > bounds.getMaxX() ||
-                            z < bounds.getMinZ() || z > bounds.getMaxZ()) {
-                        continue;
-                    }
-
-                    // Try different Y levels within structure bounds
-                    for (int y = bounds.getMinY(); y <= bounds.getMaxY(); y++) {
-                        BlockPos testPos = new BlockPos(x, y, z);
-
-                        // Check if position is safe
-                        if (isPositionSafeForEntity(world, testPos)) {
-                            return testPos;
-                        }
-                    }
-                }
-            }
-        }
-
-        return null;
     }
 
     public static ActionFactory<Entity> getFactory() {
