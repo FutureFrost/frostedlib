@@ -3,6 +3,7 @@ package com.futurefrost.frostedlib;
 import com.futurefrost.frostedlib.command.FrostedCommands;
 import com.futurefrost.frostedlib.registry.ModActions;
 import com.futurefrost.frostedlib.registry.ModComponents;
+import com.futurefrost.frostedlib.registry.ModConditions;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import org.slf4j.Logger;
@@ -37,6 +38,14 @@ public class FrostedLib implements ModInitializer {
 			LOGGER.info("Action Types Registered");
 		} catch (Exception e) {
 			LOGGER.error("Failed to Register Action Types", e);
+		}
+
+		// Register conditions
+		try {
+			ModConditions.init();
+			LOGGER.info("Conditions Registered");
+		} catch (Exception e) {
+			LOGGER.error("Failed to Register Conditions", e);
 		}
 
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {

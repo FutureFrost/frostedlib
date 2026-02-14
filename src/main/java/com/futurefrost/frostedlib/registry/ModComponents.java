@@ -35,12 +35,12 @@ public class ModComponents implements EntityComponentInitializer {
         // Register player data for players
         registry.registerForPlayers(
                 PLAYER_DATA,
-                player -> new PlayerDataComponentImpl(),
+                PlayerDataComponentImpl::new,
                 RespawnCopyStrategy.ALWAYS_COPY
         );
 
         // Register entity data for ALL entities
-        registry.registerFor(Entity.class, ENTITY_DATA, entity -> new EntityDataComponentImpl());
+        registry.registerFor(Entity.class, ENTITY_DATA, EntityDataComponentImpl::new);
     }
 
     public static void init() {

@@ -10,10 +10,16 @@ import java.util.Optional;
 
 public class EntityDataComponentImpl implements EntityDataComponent {
     private final Map<String, PositionData> savedPositions = new HashMap<>();
+    private final Object provider; // Store the entity
+
+    public EntityDataComponentImpl(Object provider) {
+        this.provider = provider;
+    }
 
     @Override
     public void savePosition(String id, PositionData position) {
         savedPositions.put(id, position);
+        // Note: No sync for non-player entities
     }
 
     @Override
