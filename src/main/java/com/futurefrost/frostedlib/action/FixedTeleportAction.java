@@ -17,7 +17,6 @@ public class FixedTeleportAction extends BaseTeleportAction {
         DATA = new SerializableData()
                 // Core Targeting
                 .add("target_dimension", SerializableDataTypes.IDENTIFIER, null)
-                .add("bring_mount", SerializableDataTypes.BOOLEAN, true)
                 .add("generate_platform", SerializableDataTypes.BOOLEAN, false)
                 .add("max_search_attempts", SerializableDataTypes.INT, 50)
                 .add("on_error", ApoliDataTypes.ENTITY_ACTION, null)
