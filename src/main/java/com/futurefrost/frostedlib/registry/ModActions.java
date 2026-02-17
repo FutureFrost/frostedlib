@@ -81,5 +81,13 @@ public class ModActions {
         );
 
         FrostedLib.LOGGER.info("structure_teleport registered");
+
+        Registry.register(
+                ApoliRegistries.ENTITY_ACTION,
+                Identifier.of(FrostedLib.MOD_ID, "action_at_pos"),
+                ActionAtPosAction.getFactory()
+        );
+
+        FrostedLib.LOGGER.info("action_at_pos registered");
     }
 }
