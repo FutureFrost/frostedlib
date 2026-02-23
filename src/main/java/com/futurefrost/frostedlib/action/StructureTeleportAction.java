@@ -9,6 +9,7 @@ import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.structure.StructurePiece;
 import net.minecraft.structure.StructureStart;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.*;
@@ -23,12 +24,14 @@ public class StructureTeleportAction extends BaseTeleportAction {
 
     static {
         DATA = createCommonDataWithoutHeightDefault()
-                .add("target_height", SerializableDataTypes.STRING, "exposed") // Add default for structure
+                // Override target_height default to "fixed" for structure
+                .add("target_height", SerializableDataTypes.STRING, "fixed")
                 .add("strict_height", SerializableDataTypes.BOOLEAN, false)
                 // Structure specific fields
                 .add("structure_id", SerializableDataTypes.IDENTIFIER)
                 .add("chunk_search_radius", SerializableDataTypes.INT, 100)
-                .add("scale_factor", SerializableDataTypes.DOUBLE, 1.0);
+                .add("scale_factor", SerializableDataTypes.DOUBLE, 1.0)
+                .add("strict_structure", SerializableDataTypes.BOOLEAN, true);
     }
 
     @Override
@@ -40,6 +43,7 @@ public class StructureTeleportAction extends BaseTeleportAction {
 
         int searchRadius = data.getInt("chunk_search_radius");
         double scaleFactor = data.getDouble("scale_factor");
+        boolean strictStructure = data.getBoolean("strict_structure");
 
         // Calculate search start position using scale factor.
         BlockPos searchStartPos = calculateScaledSearchPosition(entity, world, scaleFactor);
@@ -69,12 +73,25 @@ public class StructureTeleportAction extends BaseTeleportAction {
             throw new RuntimeException("Structure found but not generated at position: " + structurePos.toShortString());
         }
 
+        // Store structure bounding boxes in data for later validation
+        if (strictStructure) {
+            // Store the structure start reference for validation
+            data.set("cached_structure_start", structureStart);
+        }
+
         // Get the center of the structure's bounding box
         BlockPos structureCenter = new BlockPos(structureStart.getBoundingBox().getCenter());
 
+        // Override the target_y in the data with the structure's Y-level
+        // This ensures fixed height mode uses the structure's Y position
+        if (!data.isPresent("target_y")) {
+            // Only set if not explicitly provided by the user
+            data.set("target_y", (double) structureCenter.getY());
+        }
+
         // Return the structure center - PositionFinder will handle the safe position search
-        // with proper height mode configuration
-        return new Vec3d(structureCenter.getX(), 64, structureCenter.getZ()); // Y=64 as reference point
+        // with fixed height mode using the structure's Y-level
+        return new Vec3d(structureCenter.getX(), structureCenter.getY(), structureCenter.getZ());
     }
 
     private Optional<Pair<BlockPos, Structure>> getStructurePos(ServerWorld world, Identifier structureId,

@@ -8,6 +8,8 @@ import net.minecraft.block.ShapeContext;
 import net.minecraft.entity.Entity;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.structure.StructurePiece;
+import net.minecraft.structure.StructureStart;
 import net.minecraft.util.math.*;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.Heightmap;
@@ -265,7 +267,48 @@ public class PositionFinder {
                 && !isColumnEmpty(world, x, z)
                 && !containsUnsafeLiquids(data, world, entityHitbox)
                 && isHitboxVolumeEmpty(world, entityHitbox, entity)
-                && hasSolidGround(world, entityHitbox);
+                && hasSolidGround(world, entityHitbox)
+                && isWithinStructure(data, world, x, y, z, entity);
+    }
+
+    private boolean isWithinStructure(SerializableData.Instance data, ServerWorld world,
+                                      int x, int y, int z, Entity entity) {
+        // Check if structure validation is required
+        if (!data.isPresent("structure_id") && !data.isPresent("strict_structure")) {
+            return true; // No structure requirement
+        }
+
+        boolean strictStructure = data.getBoolean("strict_structure");
+        if (!strictStructure) {
+            return true; // Not strict, so any position is acceptable
+        }
+
+        StructureStart cachedStart = data.get("cached_structure_start");
+        if (cachedStart == null) {
+            return true; // No cached structure start
+        }
+
+        // Create the entity's full hitbox at this position
+        Box entityHitbox = createEntityHitbox(x + 0.5, y, z + 0.5, entity);
+
+        // Check if the entity's hitbox intersects with any piece of the structure
+        for (StructurePiece piece : cachedStart.getChildren()) {
+            Box pieceBox = new Box(
+                    piece.getBoundingBox().getMinX(),
+                    piece.getBoundingBox().getMinY(),
+                    piece.getBoundingBox().getMinZ(),
+                    piece.getBoundingBox().getMaxX(),
+                    piece.getBoundingBox().getMaxY(),
+                    piece.getBoundingBox().getMaxZ()
+            );
+
+            // Check if the entity's full hitbox intersects with this structure piece
+            if (entityHitbox.intersects(pieceBox)) {
+                return true; // Position is within structure
+            }
+        }
+
+        return false; // Position is not within any structure piece
     }
 
     private boolean isHitboxVolumeEmpty(ServerWorld world, Box hitbox, Entity entity) {
