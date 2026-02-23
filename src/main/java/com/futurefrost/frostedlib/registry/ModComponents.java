@@ -40,7 +40,7 @@ public class ModComponents implements EntityComponentInitializer {
         );
 
         // Register entity data for ALL entities
-        registry.registerFor(Entity.class, ENTITY_DATA, EntityDataComponentImpl::new);
+        registry.registerFor(Entity.class, ENTITY_DATA, provider -> new EntityDataComponentImpl());
     }
 
     public static void init() {

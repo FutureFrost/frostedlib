@@ -198,7 +198,7 @@ public abstract class BaseTeleportAction {
     }
 
     // Helper method to calculate scaled position for dimension search
-    protected BlockPos calculateScaledSearchPosition(Entity entity, ServerWorld targetWorld, double scaleFactor) {
+    protected BlockPos calculateScaledSearchPosition(Entity entity, double scaleFactor) {
         // Get entity's current position
         Vec3d currentPos = entity.getPos();
 

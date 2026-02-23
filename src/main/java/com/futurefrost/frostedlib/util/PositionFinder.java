@@ -268,10 +268,10 @@ public class PositionFinder {
                 && !containsUnsafeLiquids(data, world, entityHitbox)
                 && isHitboxVolumeEmpty(world, entityHitbox, entity)
                 && hasSolidGround(world, entityHitbox)
-                && isWithinStructure(data, world, x, y, z, entity);
+                && isWithinStructure(data, x, y, z, entity);
     }
 
-    private boolean isWithinStructure(SerializableData.Instance data, ServerWorld world,
+    private boolean isWithinStructure(SerializableData.Instance data,
                                       int x, int y, int z, Entity entity) {
         // Check if structure validation is required
         if (!data.isPresent("structure_id") && !data.isPresent("strict_structure")) {

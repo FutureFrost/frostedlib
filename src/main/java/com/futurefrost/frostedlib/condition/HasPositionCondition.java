@@ -22,9 +22,7 @@ public class HasPositionCondition {
         Optional<PositionData> savedPosition = ModComponents.PLAYER_DATA.maybeGet(entity)
                 .map(component -> component.getPosition(positionId))
                 .orElseGet(() ->
-                        ModComponents.ENTITY_DATA.maybeGet(entity)
-                                .map(component -> component.getPosition(positionId))
-                                .orElse(Optional.empty())
+                        ModComponents.ENTITY_DATA.maybeGet(entity).flatMap(component -> component.getPosition(positionId))
                 );
 
         // First check: does the position exist at all?

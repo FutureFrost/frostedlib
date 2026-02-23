@@ -52,7 +52,7 @@ public class BiomeTeleportAction extends BaseTeleportAction {
         double scaleFactor = data.getDouble("scale_factor");
 
         // Calculate search start position using scale factor
-        BlockPos searchStartPos = calculateScaledSearchPosition(entity, world, scaleFactor);
+        BlockPos searchStartPos = calculateScaledSearchPosition(entity, scaleFactor);
 
         // Search for biome
         Pair<BlockPos, RegistryEntry<Biome>> biomeResult = world.locateBiome(

@@ -9,7 +9,6 @@ import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.structure.StructurePiece;
 import net.minecraft.structure.StructureStart;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.*;
@@ -46,7 +45,7 @@ public class StructureTeleportAction extends BaseTeleportAction {
         boolean strictStructure = data.getBoolean("strict_structure");
 
         // Calculate search start position using scale factor.
-        BlockPos searchStartPos = calculateScaledSearchPosition(entity, world, scaleFactor);
+        BlockPos searchStartPos = calculateScaledSearchPosition(entity, scaleFactor);
 
         // Get the structure position closest to scaled position
         Optional<Pair<BlockPos, Structure>> structureResult = getStructurePos(world, structureId, searchStartPos, searchRadius);

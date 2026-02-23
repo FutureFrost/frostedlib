@@ -10,10 +10,9 @@ import java.util.Optional;
 
 public class EntityDataComponentImpl implements EntityDataComponent {
     private final Map<String, PositionData> savedPositions = new HashMap<>();
-    private final Object provider; // Store the entity
 
-    public EntityDataComponentImpl(Object provider) {
-        this.provider = provider;
+    public EntityDataComponentImpl() {
+        // Store the entity
     }
 
     @Override
@@ -51,4 +50,5 @@ public class EntityDataComponentImpl implements EntityDataComponent {
     public void writeToNbt(@NotNull NbtCompound nbt) {
         NbtHelper.writeSavedPositionsToNbt(nbt, savedPositions);
     }
+
 }
