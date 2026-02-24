@@ -8,6 +8,6 @@ A library for Origins teleportation and position management.
 
 ## What is FrostedLib?
 
-FrostedLib is a library designed to simplify and enhance teleportation mechanics and position tracking for Origins Datapacks. It provides simple methods for saving and managing player coordinates, as well as for handling complex teleportation scenarios, with a couple of other features thrown in.
+FrostedLib is a library designed to simplify and enhance teleportation mechanics and position tracking for Origins data packs. It provides simple methods for saving and managing player coordinates, as well as for handling complex teleportation scenarios, with a couple of other features thrown in.
 
 Check out the [wiki](https://github.com/FutureFrost/frostedlib/wiki) for detailed information and usage examples.
