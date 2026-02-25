@@ -31,6 +31,7 @@ public abstract class BaseTeleportAction {
                 .add("platform_block", SerializableDataTypes.IDENTIFIER, Identifier.of("minecraft", "obsidian"))
                 .add("platform_shape", SerializableDataTypes.STRING, "square")
                 .add("platform_size", SerializableDataTypes.INT, 2)
+                .add("force_platform", SerializableDataTypes.BOOLEAN, false)
                 .add("random_offset", SerializableDataTypes.DOUBLE, 0.0)
                 .add("search_radius", SerializableDataTypes.INT, 32)
                 .add("show_message", SerializableDataTypes.BOOLEAN, false)

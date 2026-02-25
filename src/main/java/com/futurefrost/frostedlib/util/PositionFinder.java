@@ -45,6 +45,7 @@ public class PositionFinder {
         double preferredY = resolvePreferredY(data, entity, heightMode);
         boolean strictHeight = data.getBoolean("strict_height");
         boolean generatePlatform = data.getBoolean("generate_platform");
+        boolean forcePlatform = data.getBoolean("force_platform");
         int searchRadius = Math.min(data.getInt("search_radius"), MAX_SEARCH_RADIUS);
         int maxAttempts = data.getInt("max_search_attempts");
 
@@ -57,7 +58,12 @@ public class PositionFinder {
             Vec3d exactPos = findPositionAtColumn(data, world, centerX, centerZ,
                     heightMode, preferredY, strictHeight, entity);
             if (exactPos != null) {
-                return exactPos;
+                if (generatePlatform && forcePlatform) {
+                    return platformGenerator.generatePlatformAtPosition(data, world, (int) exactPos.x, (int) exactPos.z, (int) exactPos.y);
+                }
+                else {
+                    return exactPos;
+                }
             }
         }
 
@@ -65,7 +71,12 @@ public class PositionFinder {
         Vec3d foundPos = searchExpandingSquare(data, world, centerX, centerZ,
                 heightMode, preferredY, strictHeight, searchRadius, maxAttempts, entity);
         if (foundPos != null) {
-            return foundPos;
+            if (generatePlatform && forcePlatform) {
+                return platformGenerator.generatePlatformAtPosition(data, world, (int) foundPos.x, (int) foundPos.z, (int) foundPos.y);
+            }
+            else {
+                return foundPos;
+            }
         }
 
         // STAGE 3: Platform generation
@@ -80,7 +91,15 @@ public class PositionFinder {
 
         // STAGE 4: Fallback
         if (!strictHeight) {
-            return getFallbackPosition(data, world, centerX, centerZ, heightMode, preferredY, entity);
+            Vec3d fallbackPosition = getFallbackPosition(data, world, centerX, centerZ, heightMode, preferredY, entity);
+            if (fallbackPosition != null) {
+                if (generatePlatform && forcePlatform) {
+                    return platformGenerator.generatePlatformAtPosition(data, world, (int) fallbackPosition.x, (int) fallbackPosition.z, (int) fallbackPosition.y);
+                }
+                else {
+                    return fallbackPosition;
+                }
+            }
         }
 
         return null;
