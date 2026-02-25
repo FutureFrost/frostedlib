@@ -6,9 +6,7 @@ A library for Origins teleportation and position management.
 [![Fabric](https://img.shields.io/badge/mod%20loader-Fabric-dbd0b4.svg)](https://fabricmc.net/)
 [![Java](https://img.shields.io/badge/java-17%2B-orange.svg)](https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html)
 
-[Modrinth](https://modrinth.com/mod/frostedlib) 
-
-[Curseforge](https://www.curseforge.com/minecraft/mc-mods/frostedlib)
+### Available on [Modrinth](https://modrinth.com/mod/frostedlib) and [Curseforge](https://www.curseforge.com/minecraft/mc-mods/frostedlib)!
 
 ## What is FrostedLib?
 
