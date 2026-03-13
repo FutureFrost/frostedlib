@@ -18,5 +18,13 @@ public class ModConditions {
 
         FrostedLib.LOGGER.info("has_position condition registered");
 
+        Registry.register(
+                ApoliRegistries.ENTITY_CONDITION,
+                Identifier.of(FrostedLib.MOD_ID, "total_xp"),
+                TotalXpCondition.getFactory()
+        );
+
+        FrostedLib.LOGGER.info("total_xp condition registered");
+
     }
 }
